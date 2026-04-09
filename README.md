@@ -1,6 +1,6 @@
-# 🌟 Smart Learning AI
+# 🌟 CODEDOJO
 
-**Smart Learning AI** is a full-stack AI-powered learning assistant that transforms PDFs into interactive study experiences. Chat with your documents, generate quizzes & flashcards, get summaries, and track your learning progress — all powered by **Google Gemini AI** and built with the **MERN stack**.  
+**CODEDOJO** is a full-stack AI-powered learning assistant that transforms PDFs into interactive study experiences. Chat with your documents, generate quizzes & flashcards, get summaries, and track your learning progress — all powered by **Google Gemini AI** and built with the **MERN stack**.  
 
 ---
 

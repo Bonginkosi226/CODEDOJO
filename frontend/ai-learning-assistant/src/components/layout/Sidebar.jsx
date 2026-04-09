@@ -54,7 +54,7 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
               <BrainCircuit size={20} strokeWidth={2.5} className="text-white" />
             </div>
             <h1 className="text-sm md:text-base font-bold text-slate-900 tracking-tight">
-              AI Learning Assistant
+              CODEDOJO
             </h1>
           </div>
 
