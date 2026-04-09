@@ -4,117 +4,104 @@ import Quiz from '../models/Quiz.js';
 import { extractTextFromPDF } from '../utils/pdfParser.js';
 import { chunkText } from '../utils/textChunker.js';
 import fs from 'fs/promises';
-import mongoose from 'mongoose';
 
-
-
-//@desc  Upload PDF document
-//@route POST /api/documnets/upload
-//@access Private
-
-
-//REQ.FILE:
-// {
-//   fieldname: "file",
-//   originalname: "resume.pdf",
-//   encoding: "7bit",
-//   mimetype: "application/pdf",
-//   destination: "backend/uploads/documents",
-//   filename: "17123456789-123456789-resume.pdf",
-//   path: "backend/uploads/documents/17123456789-123456789-resume.pdf",
-//   size: 245678
-// }
+// @desc    Upload PDF document
+// @route   POST /api/documents/upload
+// @access  Private
 export const uploadDocument = async (req, res, next) => {
-    try{
-         console.log('UPLOAD REQUEST:', {
-            file: req.file,
-            body: req.body,
-            user: req.user?._id
-         });
+  try {
+    console.log('UPLOAD REQUEST:', {
+      file: req.file,
+      body: req.body,
+      user: req.user?._id
+    });
 
-         if(!req.file) {
-            return res.status(400).json({
-                success: false,
-                error: 'Please upload a PDF file',
-                statusCode: 400
-            })
-         }
-
-         const { title } = req.body;
-
-         if (!title) {
-            return res.status(400).json({
-                success: false,
-                error: 'Please provide a document title',
-                statusCode: 400
-            });
-         }
-
-         //Construct thr URL for the uploaded file
-    //     const baseUrl = process.env.NODE_ENV === 'production' 
-    // ? 'https://smart-learning-ai-dw4t.onrender.com' 
-    // : `http://localhost:${process.env.PORT || 8000}`;
-    //      const fileUrl = `${baseUrl}/uploads/documents/${req.file.filename}`;
-
-         //create document record
-
-         const document = await Document.create({
-            userId: req.user._id,
-            title,
-            fileName: req.file.originalname,
-            filePath: req.file.path,
-            fileSize: req.file.size,
-            status: 'processing'
-         });
-
-         // Process PDF in background (in production, use a queue like Bull)
-         processPDF(document._id, req.file.path).catch(err => {
-            console.log('PDF processing error:', err);
-         });
-
-
-         res.status(201).json({
-            success: true,
-            data: document,
-            message: 'Document uploaded successfully. Processing in progress....'
-         });
-
-    } catch (error) {
-        console.error('UPLOAD ERROR:', error);
-        next(error);
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authorized',
+        statusCode: 401
+      });
     }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please upload a PDF file',
+        statusCode: 400
+      });
+    }
+
+    const { title } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide a document title',
+        statusCode: 400
+      });
+    }
+
+    const document = await Document.create({
+      userId: req.user._id,
+      title: title.trim(),
+      fileName: req.file.originalname,
+      filePath: req.file.path,
+      fileSize: req.file.size,
+      status: 'processing'
+    });
+
+    processPDF(document._id, req.file.path).catch(async (err) => {
+      console.error('PDF processing error:', err);
+
+      try {
+        await Document.findByIdAndUpdate(document._id, {
+          status: 'failed'
+        });
+      } catch (updateError) {
+        console.error('Failed to update document status:', updateError);
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      data: document,
+      message: 'Document uploaded successfully. Processing in progress...'
+    });
+  } catch (error) {
+    console.error('UPLOAD ERROR:', error);
+    next(error);
+  }
 };
 
-
-
-//Helper function to process PDF
+// Helper function to process PDF
 const processPDF = async (documentId, filePath) => {
-    try {
-        console.log('PROCESSING PDF:', { documentId, filePath });
-        const {text} = await extractTextFromPDF(filePath);
+  try {
+    console.log('PROCESSING PDF:', { documentId, filePath });
 
-        //Create chunks
-        const chunks = chunkText(text, 500, 50);
+    const { text } = await extractTextFromPDF(filePath);
 
-        //update document
-        await Document.findByIdAndUpdate(documentId, {
-            extractedText: text,
-            chunks: chunks,
-            status: 'ready'
-        });
-
-        console.log(`Document ${documentId} processed successfully`);
+    if (!text || !text.trim()) {
+      throw new Error('No text could be extracted from the PDF');
     }
-    catch (error) {
-        console.error(`Error processing document ${documentId}:`, error);
 
-        await Document.findByIdAndUpdate(documentId, {
-            status: 'failed'
-        });
-    }
-}
+    const chunks = chunkText(text, 500, 50);
 
+    await Document.findByIdAndUpdate(documentId, {
+      extractedText: text,
+      chunks,
+      status: 'ready'
+    });
 
+    console.log(`Document ${documentId} processed successfully`);
+  } catch (error) {
+    console.error(`Error processing document ${documentId}:`, error);
+
+    await Document.findByIdAndUpdate(documentId, {
+      status: 'failed'
+    });
+  }
+};
 
 // @desc    Get all user documents
 // @route   GET /api/documents
@@ -134,9 +121,17 @@ export const getDocuments = async (req, res, next) => {
         }
       },
       {
+        $lookup: {
+          from: 'quizzes',
+          localField: '_id',
+          foreignField: 'documentId',
+          as: 'quizSets'
+        }
+      },
+      {
         $addFields: {
           flashcardCount: { $size: '$flashcardSets' },
-          quizCount: { $size: { $ifNull: ['$quizzes', []] } }
+          quizCount: { $size: '$quizSets' }
         }
       },
       {
@@ -144,7 +139,7 @@ export const getDocuments = async (req, res, next) => {
           extractedText: 0,
           chunks: 0,
           flashcardSets: 0,
-          quizzes: 0
+          quizSets: 0
         }
       },
       {
@@ -162,65 +157,11 @@ export const getDocuments = async (req, res, next) => {
   }
 };
 
-
-
-//@desc  Get single user document
-//@route GET /api/documents/:id
-//@access Private
+// @desc    Get single user document
+// @route   GET /api/documents/:id
+// @access  Private
 export const getDocument = async (req, res, next) => {
-    try {
-        const document = await Document.findOne({
-            _id: req.params.id,
-            userId: req.user._id
-        });
-
-        if (!document) {
-            return res.status(404).json({
-                success: false,
-                error: 'Document not found',
-                statusCode: 404
-            });
-        }
-
-        // Get counts of associated flashcards and quizzes
-        const flashcardCount = await Flashcard.countDocuments({
-            documentId: document._id,
-            userId: req.user._id
-        });
-
-        const quizCount = await Quiz.countDocuments({
-            documentId: document._id,
-            userId: req.user._id
-        });
-
-        // Update last accessed time
-        document.lastAccessed = Date.now();
-        await document.save();
-
-        // Convert mongoose document to normal JS object
-        const documentData = document.toObject();
-        documentData.flashcardCount = flashcardCount;
-        documentData.quizCount = quizCount;
-
-        res.status(200).json({
-            success: true,
-            data: documentData
-        });
-
-    } catch (error) {
-        next(error);
-    }
-};
-
-
-
-
-//@desc   Delete document
-//@route  DELETE /api/documents/:id
-//@access Private
-export const deleteDocument = async (req, res, next) => {
   try {
-    // 1. Find the document that belongs to this user
     const document = await Document.findOne({
       _id: req.params.id,
       userId: req.user._id
@@ -234,26 +175,59 @@ export const deleteDocument = async (req, res, next) => {
       });
     }
 
-    // 2. Delete file from filesystem (server disk)
-    // document.filePath is a URL, so extract local path if needed
-    // If filePath stores actual disk path, this works directly
+    const flashcardCount = await Flashcard.countDocuments({
+      documentId: document._id,
+      userId: req.user._id
+    });
+
+    const quizCount = await Quiz.countDocuments({
+      documentId: document._id,
+      userId: req.user._id
+    });
+
+    document.lastAccessed = Date.now();
+    await document.save();
+
+    const documentData = document.toObject();
+    documentData.flashcardCount = flashcardCount;
+    documentData.quizCount = quizCount;
+
+    res.status(200).json({
+      success: true,
+      data: documentData
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete document
+// @route   DELETE /api/documents/:id
+// @access  Private
+export const deleteDocument = async (req, res, next) => {
+  try {
+    const document = await Document.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        error: 'Document not found',
+        statusCode: 404
+      });
+    }
+
     await fs.unlink(document.filePath).catch(() => {});
 
-    // 3. Delete document from database
     await document.deleteOne();
 
     res.status(200).json({
       success: true,
       message: 'Document deleted successfully'
     });
-
   } catch (error) {
     next(error);
   }
-  
 };
-
-
-
-
-

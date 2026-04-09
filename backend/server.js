@@ -1,80 +1,71 @@
 import dotenv from 'dotenv';
-dotenv. config();
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import connectDB from './config/db.js'
-import errorHandler from './middleware/errorHandler.js'
+import connectDB from './config/db.js';
+import errorHandler from './middleware/errorHandler.js';
 
-import authRoutes from './routes/authRoutes.js'
-import documentRoutes from './routes/documentRoutes.js'
-import flashcardRoutes from './routes/flashcardRoutes.js'
-import aiRoutes from './routes/aiRoutes.js'
-import quizRoutes from './routes/quizRoutes.js'
-import progressRoutes from './routes/progressRoutes.js'
+import authRoutes from './routes/authRoutes.js';
+import documentRoutes from './routes/documentRoutes.js';
+import flashcardRoutes from './routes/flashcardRoutes.js';
+import aiRoutes from './routes/aiRoutes.js';
+import quizRoutes from './routes/quizRoutes.js';
+import progressRoutes from './routes/progressRoutes.js';
 
-
-// ES6 module_dirname alternative
-const __filename = fileURLToPath(import.meta. url);
-const __dirname = path. dirname(__filename);
+// ES6 module __dirname alternative
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Initialize express app
-const app = express () ;
+const app = express();
+
+// Log all requests
+app.use((req, res, next) => {
+  console.log(`[REQUEST] ${req.method} ${req.url}`);
+  next();
+});
 
 // Connect to MongoDB
 connectDB();
 
-// Middleware to handle CORS
+// Middleware
 app.use(cors());
-
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended : true, limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Log all requests
-app.use((req, res, next) => {
-    console.log(`${req.method} ${req.url}`);
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-    }
-    next();
-});
+// Static folder for uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-//static folder for uploads
-//app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-// app.use(
-//   "/uploads",
-//   express.static(path.join(process.cwd(), "backend", "uploads"))
-// );
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/documents', documentRoutes);
+app.use('/api/flashcards', flashcardRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/quizzes', quizRoutes);
+app.use('/api/progress', progressRoutes);
 
-
-//Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/documents", documentRoutes);
-app.use("/api/flashcards", flashcardRoutes);
-app.use("/api/ai", aiRoutes);
-app.use("/api/quizzes", quizRoutes);
-app.use("/api/progress", progressRoutes);
-
+// Error handler
 app.use(errorHandler);
 
-//404 handler
+// 404 handler
 app.use((req, res) => {
-    res.status(404).json({
-        success: false,
-        error: 'Route not found',
-        statusCode: 404
-    });
+  res.status(404).json({
+    success: false,
+    error: 'Route not found',
+    statusCode: 404
+  });
 });
 
-//start server
+// Start server
 const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => {
-    console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });
-
 
 process.on('unhandledRejection', (err) => {
-    console.error(`Error: ${err.message}`);
-    process.exit(1);
+  console.error(`Error: ${err.message}`);
+  process.exit(1);
 });

@@ -16,6 +16,7 @@ const getDocuments = async () => {
 
 const uploadDocument = async (formData) => {
   try {
+    console.log('UPLOADING DOCUMENT...', formData.get('title'));
     const response = await axiosInstance.post(
       API_PATHS.DOCUMENTS.UPLOAD,
       formData,
@@ -27,6 +28,7 @@ const uploadDocument = async (formData) => {
     );
     return response.data;
   } catch (error) {
+    console.error('UPLOAD SERVICE ERROR:', error.response?.data || error.message);
     throw error.response?.data || {
       message: 'Failed to upload document',
     };
