@@ -29,6 +29,27 @@ password: {
     profileImage: {
         type: String,
         default: null
+    },
+    // Gamification properties
+    xp: {
+        type: Number,
+        default: 0
+    },
+    level: {
+        type: Number,
+        default: 1
+    },
+    badges: [{
+        name: String,
+        icon: String,
+        dateAwarded: {
+            type: Date,
+            default: Date.now
+        }
+    }],
+    arcadeProgress: {
+        type: Number,
+        default: 0
     }
 }, {
     timestamps: true

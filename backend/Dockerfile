@@ -8,6 +8,9 @@ COPY package.json package-lock.json ./
 # Install dependencies
 RUN npm ci --omit=dev
 
+# Install Python and Java
+RUN apk add --no-cache python3 openjdk17
+
 # Copy app source
 COPY . .
 

@@ -55,4 +55,13 @@ export const API_PATHS = {
   PROGRESS: {
     GET_DASHBOARD: "/api/progress/dashboard",
   },
+
+  ARCADE: {
+    CHAT: "/api/arcade/chat",
+  },
+  
+  LEADERBOARD: {
+    GET: "/api/leaderboard",
+    AWARD_XP: "/api/leaderboard/xp",
+  },
 };

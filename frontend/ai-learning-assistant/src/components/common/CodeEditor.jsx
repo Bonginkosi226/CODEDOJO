@@ -1,10 +1,13 @@
 import React, { useState } from "react";
 import Editor from "@monaco-editor/react";
-import { Play, RotateCcw, CheckCircle2 } from "lucide-react";
+import { Play, RotateCcw, CheckCircle2, MessageSquare, Terminal } from "lucide-react";
 import toast from "react-hot-toast";
+import axios from "axios";
 
-const CodeEditor = ({ code, setCode, language = "javascript", onRun }) => {
+const CodeEditor = ({ code, setCode, language = "python", setLanguage, onRun, onCompileResult }) => {
   const [isRunning, setIsRunning] = useState(false);
+  const [isCompiling, setIsCompiling] = useState(false);
+  const [output, setOutput] = useState("");
 
   const handleEditorChange = (value) => {
     if (value !== undefined) {
@@ -12,9 +15,9 @@ const CodeEditor = ({ code, setCode, language = "javascript", onRun }) => {
     }
   };
 
-  const handleRunCode = async () => {
+  const handleAskAI = async () => {
     setIsRunning(true);
-    toast.success("Code submitted for review!");
+    toast.success("Code submitted to AI assistant!");
     
     if (onRun) {
       await onRun(code);
@@ -23,6 +26,34 @@ const CodeEditor = ({ code, setCode, language = "javascript", onRun }) => {
     setTimeout(() => {
       setIsRunning(false);
     }, 1000);
+  };
+
+  const handleCompile = async () => {
+    if (!code || code.trim() === "") return;
+    
+    setIsCompiling(true);
+    setOutput("Compiling...");
+    try {
+      const response = await axios.post("http://localhost:8000/api/execute", {
+        language: language,
+        version: language === "python" ? "3.10.0" : "17.0.2",
+        files: [{ content: code }]
+      });
+      const result = response.data.run.output || "Program finished with no output.";
+      setOutput(result);
+      // Notify parent about the compilation result
+      if (onCompileResult) {
+        onCompileResult(code, result);
+      }
+    } catch (error) {
+      const errorMsg = "Compilation error: " + (error.response?.data?.message || error.message);
+      setOutput(errorMsg);
+      if (onCompileResult) {
+        onCompileResult(code, errorMsg);
+      }
+    } finally {
+      setIsCompiling(false);
+    }
   };
 
   const handleReset = () => {
@@ -42,9 +73,20 @@ const CodeEditor = ({ code, setCode, language = "javascript", onRun }) => {
           <span className="text-xs font-mono font-semibold text-slate-300 uppercase tracking-wider ml-2">
             CodeDojo IDE
           </span>
-          <span className="px-2 py-0.5 rounded bg-slate-700 text-[10px] text-slate-300 font-mono">
-            {language}
-          </span>
+          {setLanguage ? (
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-xs text-slate-200 font-mono outline-none border border-slate-600 cursor-pointer"
+            >
+              <option value="python">Python</option>
+              <option value="java">Java</option>
+            </select>
+          ) : (
+            <span className="px-2 py-0.5 rounded bg-slate-700 text-[10px] text-slate-300 font-mono">
+              {language}
+            </span>
+          )}
         </div>
         
         <div className="flex items-center gap-2">
@@ -56,19 +98,36 @@ const CodeEditor = ({ code, setCode, language = "javascript", onRun }) => {
             <RotateCcw size={16} />
           </button>
           <button
-            onClick={handleRunCode}
+            onClick={handleCompile}
+            disabled={isCompiling}
+            className="flex items-center gap-2 px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isCompiling ? (
+              <span className="flex items-center gap-1.5">
+                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Compiling...
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5">
+                <Play size={14} fill="currentColor" />
+                Run Code
+              </span>
+            )}
+          </button>
+          <button
+            onClick={handleAskAI}
             disabled={isRunning}
             className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isRunning ? (
               <span className="flex items-center gap-1.5">
                 <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Running
+                Asking...
               </span>
             ) : (
               <span className="flex items-center gap-1.5">
-                <Play size={14} fill="currentColor" />
-                Submit Code
+                <MessageSquare size={14} fill="currentColor" />
+                Ask AI
               </span>
             )}
           </button>
@@ -97,6 +156,19 @@ const CodeEditor = ({ code, setCode, language = "javascript", onRun }) => {
             formatOnPaste: true,
           }}
         />
+      </div>
+
+      {/* Output Console area */}
+      <div className="h-48 border-t border-slate-700 bg-[#1e1e1e] flex flex-col shrink-0">
+        <div className="px-4 py-2 border-b border-[#333] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Terminal size={14} className="text-slate-400" />
+            <span className="text-xs font-mono text-slate-300 font-bold uppercase tracking-wider">Output Console</span>
+          </div>
+        </div>
+        <div className="flex-1 p-4 overflow-y-auto font-mono text-sm bg-black text-slate-300 whitespace-pre-wrap leading-relaxed shadow-inner">
+          {output || <span className="text-slate-600 italic">No output yet. Click 'Run Code' to execute.</span>}
+        </div>
       </div>
     </div>
   );

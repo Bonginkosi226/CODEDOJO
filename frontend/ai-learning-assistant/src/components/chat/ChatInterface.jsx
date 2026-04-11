@@ -15,6 +15,7 @@ const ChatInterface = () => {
   const [history, setHistory] = useState([]);
   const [message, setMessage] = useState("");
   const [code, setCode] = useState("// Write your code here to submit it for AI review...");
+  const [language, setLanguage] = useState("python");
   const [showEditor, setShowEditor] = useState(true);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -228,10 +229,11 @@ const ChatInterface = () => {
           <CodeEditor 
             code={code} 
             setCode={setCode} 
-            language="javascript" 
+            language={language}
+            setLanguage={setLanguage}
             onRun={async (currentCode) => {
                // Programatically hit the chat with code attached
-               const promptMsg = "Can you review my code and provide feedback based on the concepts in the document?\n\n```javascript\n" + currentCode + "\n```";
+               const promptMsg = "Can you review my code and provide feedback based on the concepts in the document?\n\n```" + language + "\n" + currentCode + "\n```";
                const e = new Event("submit");
                const prevMessage = message;
                setMessage((message ? message + "\n\n" : "") + promptMsg);
