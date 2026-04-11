@@ -1,131 +1,75 @@
-# 🌟 CODEDOJO
+# 🥋 CodeDojo Arcade
 
-**CODEDOJO** is a full-stack AI-powered learning assistant that transforms PDFs into interactive study experiences. Chat with your documents, generate quizzes & flashcards, get summaries, and track your learning progress — all powered by **Google Gemini AI** / **Mistral AI** and built with the **MERN stack**.
-
----
-
-## 🚀 Key Features
-
-*   **💬 Document Chat:** Chat with uploaded PDFs (RAG) for instant Q&A.
-*   **📝 Auto-Generation:** Instantly generate flashcards & quizzes from PDF context.
-*   **📚 Smart Summaries:** Summarize long documents intelligently.
-*   **📈 Progress Tracking:** Track learning streaks, scores, and review metrics.
-*   **🔍 Semantic Search:** Vector embeddings for high-accuracy document retrieval.
-*   **🐳 Fully Dockerized:** Easy setup and consistent environments across teams.
+**CodeDojo Arcade** is a professional, high-engagement programming learning platform designed for university-level students. It transforms difficult computer science concepts into a gamified, structured journey guided by **Sensei**, a passionate technical mentor.
 
 ---
 
-## 🏗 System Architecture
-
-The project is structured as a mono-repo containing both the frontend and backend:
-
-*   **`/frontend/ai-learning-assistant/`**: React + Vite SPA using TailwindCSS.
-*   **`/backend/`**: Node.js + Express API. Handles MongoDB connections, AI orchestration (Gemini/Mistral), and file uploads (Multer).
-
-### AI Workflow (Retrieval-Augmented Generation)
-
-1.  **Ingestion:** PDF uploaded → Parsed to text → Chunked
-2.  **Storage:** Chunks converted to vector embeddings → Stored in MongoDB
-3.  **Retrieval:** User asks question → Question embedded → Closest chunks retrieved
-4.  **Generation:** Context + Question sent to LLM → Generates grounded response
+## 🏛️ Project Evolution
+This project has evolved from a general AI PDF study tool into a specialized **Arcade Dojo**. 
+- **The Pivot:** We scrapped the chat-based interface in favor of a **"Dojo Path"**—a structured, W3Schools-style split-pane experience where students follow a curated curriculum on the left and write code on the right.
+- **Pedagogy:** The core focus is on "Technical Depth with Compassion." Sensei uses industrial terminology (JVM, Bytecode, Stack/Heap) but explains it through logical analogies.
 
 ---
 
-## 💻 Developer Setup Guide
+## 🛠️ Key Systems
 
-This project is fully containerized using Docker, which is the recommended way to run the application to avoid node version and dependency conflicts.
+### 1. The Dojo Path (Arcade)
+*   **Location:** `/frontend/src/pages/Arcade/ArcadePage.jsx`
+*   **Logic:** A split-pane layout with integrated **Monaco Editor**.
+*   **Curriculum:** Lessons are pulled from `src/data/curriculum.js`. Each lesson features a narrative, a code example, and a specific "Mission Objective."
+*   **Validation:** The next lesson remains locked until the student's code produces an output that satisfies the mission's logic rules.
 
-### Prerequisites
+### 2. Sensei (AI Assistant)
+*   **Knowledge Base:** Located in `/backend/controllers/arcadeController.js`.
+*   **Persona:** A wise, professional mentor. Strictly forbids "childish" metaphors (no magic spells).
+*   **Help System:** The "Ask Sensei" button sends the student's code and output to the backend, where Sensei provides a contextual hint without giving the full answer.
+*   **Voice (TTS):** Integrated via the Web Speech API. Sensei narrates lessons aloud if the speaker icon is toggled on.
 
-*   [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
-*   [Node.js (v20+)](https://nodejs.org/) (optional, if running without Docker)
-*   A MongoDB Atlas URI
-
-### 1. Clone the Repository
-
-```bash
-git clone <repository-url>
-cd CODEDOJO
-```
-
-### 2. Environment Variables
-
-Create a `.env` file inside the `backend/` directory:
-
-```bash
-cd backend
-touch .env
-```
-
-Add the following keys to your `backend/.env` file:
-
-```env
-# Server
-PORT=8000
-NODE_ENV=development
-
-# Database
-MONGODB_URL=mongodb+srv://<your-cluster-url>
-
-# Authentication
-JWT_SECRET=your_jwt_secret_here
-JWT_EXPIRE=30d
-
-# AI Services
-GEMINI_API_KEY=your_google_gemini_api_key
-MISTRAL_API_KEY=your_mistral_api_key
-
-# Cloud Storage (Optional - falls back to local storage)
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
-```
-
-### 3. Running with Docker (Recommended)
-
-From the root project directory (`CODEDOJO/`), run:
-
-```bash
-# Build the images and start the containers
-docker compose up --build
-```
-
-*   **Frontend:** `http://localhost:5173`
-*   **Backend API:** `http://localhost:8000`
-
-> **Note:** Uploaded PDFs are stored in the `backend/uploads/` directory, which is bind-mounted to the host machine so your files persist across container restarts.
-
-To stop the application:
-```bash
-docker compose down
-```
-
-### Alternative: Running Locally (Without Docker)
-
-If you prefer to run the servers directly on your machine:
-
-**Terminal 1 (Backend):**
-```bash
-cd backend
-npm install
-npm run dev
-```
-
-**Terminal 2 (Frontend):**
-```bash
-cd frontend/ai-learning-assistant
-npm install
-npm run dev
-```
+### 3. Telemetry & Analytics
+*   **Provider:** `/frontend/src/context/TelemetryContext.jsx`
+*   **Pipeline:** Tracks page views, clicks, and code compilation successes/errors.
+*   **Optimization:** Events are batched and sent to the backend `/api/telemetry/bulk` every 10 seconds to minimize database overhead.
 
 ---
 
-## ⚡ Tech Stack Details
+## 🔧 How to Tweak & Customize
 
-*   **Frontend:** React, Vite, TailwindCSS, Lucide React, Axios
-*   **Backend:** Node.js, Express.js, Mongoose, Multer (File Uploads), JWT
-*   **AI & Vector Search:**
-    *   Google Gemini AI (`@google/genai`)
-    *   Mistral AI & Embeddings (`@langchain/mistralai`)
-    *   LangChain TextSplitters and MemoryVectorStore
-*   **Database:** MongoDB Atlas
+### 🎓 Adding/Editing Lessons
+Open `frontend/src/data/curriculum.js`. To add a new lesson, append an object to the `PYTHON_CURRICULUM` or `JAVA_CURRICULUM` arrays:
+```javascript
+{
+  id: "jv-new",
+  title: "New Lesson",
+  concept: "The Concept",
+  narrative: "The text Sensei speaks...",
+  example: "Code example block...",
+  goal: "The actual task for the student...",
+  initialCode: "Starter code in editor...",
+  validation: (output) => output.includes("Expected Result"),
+  xp: 100
+}
+```
+
+### 🧠 Adjusting Sensei's Persona
+Navigate to `backend/controllers/arcadeController.js`. You can modify the `SYSTEM_PROMPT` constant to change his tone, rules, or even transition him to a different language/expertise.
+
+### 🔥 Gamification & XP
+To adjust how XP is calculated, modify the `handleCompileResult` in `ArcadePage.jsx`. Currently, each lesson defines its own `xp` reward in the curriculum data.
+
+---
+
+## 🚀 Tech Stack
+- **Frontend:** React, Tailwind CSS, Lucide Icons, Monaco Editor (@monaco-editor/react).
+- **Backend:** Node.js, Express, MongoDB (Mongoose).
+- **Execution:** Piston API (Local or Remote) for code compilation.
+- **AI:** Google Gemini (via Mistral/LangChain integration in the backend).
+
+---
+
+## 📦 Running Locally
+```bash
+# Start all services with Docker
+docker-compose up -d --build
+```
+*   **Frontend:** http://localhost:5173
+*   **Backend:** http://localhost:8000
