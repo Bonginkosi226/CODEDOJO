@@ -1,95 +1,131 @@
 # 🌟 CODEDOJO
 
-**CODEDOJO** is a full-stack AI-powered learning assistant that transforms PDFs into interactive study experiences. Chat with your documents, generate quizzes & flashcards, get summaries, and track your learning progress — all powered by **Google Gemini AI** and built with the **MERN stack**.  
-
----
-
-## 🔗 Live Application
-
-- **Frontend:** [smart-learning-ai-sigma.vercel.app](https://smart-ai-learning.netlify.app/)  
-- **Backend API:** [smart-learning-ai-dw4t.onrender.com](https://smart-learning-ai-dw4t.onrender.com)  
+**CODEDOJO** is a full-stack AI-powered learning assistant that transforms PDFs into interactive study experiences. Chat with your documents, generate quizzes & flashcards, get summaries, and track your learning progress — all powered by **Google Gemini AI** / **Mistral AI** and built with the **MERN stack**.
 
 ---
 
 ## 🚀 Key Features
 
-- 💬 Chat with uploaded PDFs for instant Q&A  
-- 📝 Auto-generate flashcards & quizzes  
-- 📚 Summarize documents intelligently  
-- 📈 Track learning progress over time  
-- 🔍 Vector semantic search with embeddings  
-- 🔒 Secure authentication & persistent chat history  
-
----
-
-## 🛠 How It Works
-
-Smart Learning AI uses **Retrieval-Augmented Generation (RAG)** with LangChain:  
-User Query
-->
-Text Splitting & Embedding Generation
-->
-Vector Similarity Search (MongoDB + Embeddings)
-->
-Context Retrieval from PDFs
-->
-LLM Response Generation
-
-
-- Documents are chunked, embedded, and stored as vectors.  
-- Queries are matched with chunks using semantic search before generating AI responses.  
-- AI generates summaries, flashcards, and quizzes from the same contextual data.  
+*   **💬 Document Chat:** Chat with uploaded PDFs (RAG) for instant Q&A.
+*   **📝 Auto-Generation:** Instantly generate flashcards & quizzes from PDF context.
+*   **📚 Smart Summaries:** Summarize long documents intelligently.
+*   **📈 Progress Tracking:** Track learning streaks, scores, and review metrics.
+*   **🔍 Semantic Search:** Vector embeddings for high-accuracy document retrieval.
+*   **🐳 Fully Dockerized:** Easy setup and consistent environments across teams.
 
 ---
 
 ## 🏗 System Architecture
-User
-->
-Frontend (React + Vite + TailwindCSS) [Vercel]
-->
-Backend API (Node.js + Express) [Render]
-->
-MongoDB Atlas (Document Storage + Vector Embeddings)
 
+The project is structured as a mono-repo containing both the frontend and backend:
 
-**Persistence:**  
+*   **`/frontend/ai-learning-assistant/`**: React + Vite SPA using TailwindCSS.
+*   **`/backend/`**: Node.js + Express API. Handles MongoDB connections, AI orchestration (Gemini/Mistral), and file uploads (Multer).
 
-- Database → MongoDB Atlas  
-- Uploaded PDFs → Backend storage on Render  
+### AI Workflow (Retrieval-Augmented Generation)
 
----
-
-## ⚡ Tech Stack
-
-**Frontend**  
-- React | Vite | TailwindCSS | Vercel  
-
-**Backend**  
-- Node.js | Express | LangChain | Google Gemini AI | MongoDB  
-
-**AI**  
-- Gemini LLM models  
-- Gemini embeddings  
-- LangChain (TextSplitter, Retriever, Vector Embeddings)  
-
-**Infrastructure**  
-- Render (Backend hosting)  
-- Vercel (Frontend hosting)  
+1.  **Ingestion:** PDF uploaded → Parsed to text → Chunked
+2.  **Storage:** Chunks converted to vector embeddings → Stored in MongoDB
+3.  **Retrieval:** User asks question → Question embedded → Closest chunks retrieved
+4.  **Generation:** Context + Question sent to LLM → Generates grounded response
 
 ---
 
+## 💻 Developer Setup Guide
+
+This project is fully containerized using Docker, which is the recommended way to run the application to avoid node version and dependency conflicts.
+
+### Prerequisites
+
+*   [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
+*   [Node.js (v20+)](https://nodejs.org/) (optional, if running without Docker)
+*   A MongoDB Atlas URI
+
+### 1. Clone the Repository
+
+```bash
+git clone <repository-url>
+cd CODEDOJO
+```
+
+### 2. Environment Variables
+
+Create a `.env` file inside the `backend/` directory:
+
+```bash
+cd backend
+touch .env
+```
+
+Add the following keys to your `backend/.env` file:
+
+```env
+# Server
+PORT=8000
+NODE_ENV=development
+
+# Database
+MONGODB_URL=mongodb+srv://<your-cluster-url>
+
+# Authentication
+JWT_SECRET=your_jwt_secret_here
+JWT_EXPIRE=30d
+
+# AI Services
+GEMINI_API_KEY=your_google_gemini_api_key
+MISTRAL_API_KEY=your_mistral_api_key
+
+# Cloud Storage (Optional - falls back to local storage)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+```
+
+### 3. Running with Docker (Recommended)
+
+From the root project directory (`CODEDOJO/`), run:
+
+```bash
+# Build the images and start the containers
+docker compose up --build
+```
+
+*   **Frontend:** `http://localhost:5173`
+*   **Backend API:** `http://localhost:8000`
+
+> **Note:** Uploaded PDFs are stored in the `backend/uploads/` directory, which is bind-mounted to the host machine so your files persist across container restarts.
+
+To stop the application:
+```bash
+docker compose down
+```
+
+### Alternative: Running Locally (Without Docker)
+
+If you prefer to run the servers directly on your machine:
+
+**Terminal 1 (Backend):**
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+**Terminal 2 (Frontend):**
+```bash
+cd frontend/ai-learning-assistant
+npm install
+npm run dev
+```
 
 ---
 
-## 📈 Project Summary
+## ⚡ Tech Stack Details
 
-Smart Learning AI combines:  
-
-- AI-powered document retrieval (RAG)  
-- Semantic search using vector embeddings  
-- PDF-to-interactive learning conversion (chat, quizzes, flashcards, summaries)  
-- Cloud-based deployment for production-ready scalability  
-
-This makes it a **complete AI learning assistant**, ready for real users and impressive in interviews.  
-
-
+*   **Frontend:** React, Vite, TailwindCSS, Lucide React, Axios
+*   **Backend:** Node.js, Express.js, Mongoose, Multer (File Uploads), JWT
+*   **AI & Vector Search:**
+    *   Google Gemini AI (`@google/genai`)
+    *   Mistral AI & Embeddings (`@langchain/mistralai`)
+    *   LangChain TextSplitters and MemoryVectorStore
+*   **Database:** MongoDB Atlas
