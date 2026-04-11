@@ -37,7 +37,7 @@ const DocumentDetailPage = () => {
   const getPdfUrl = () => {
     if (!document?.data?.filePath) return null;
 
-    const filePath = document.data.filePath;
+    const filePath = document.data.filePath.replace(/\\/g, '/');
 
     if (
       filePath.startsWith("http://") ||
@@ -77,19 +77,12 @@ const DocumentDetailPage = () => {
             Open in new tab
           </a>
         </div>
-        <div className="bg-gray-100 p-1">
-          {/* <iframe
-            src={pdfUrl}
-            className="w-full h-[70vh] bg-white rounded border border-gray-300"
-            title="PDF Viewer"
-            frameBorder="0"
-            style={{ colorScheme: "light" }}
-          /> */}
+        <div className="bg-white p-1">
           <iframe
-  src={`https://docs.google.com/gview?url=${encodeURIComponent(pdfUrl)}&embedded=true`}
-  className="w-full h-[70vh] bg-white rounded border"
-  title="PDF Viewer"
-/>
+            src={pdfUrl}
+            className="w-full h-[80vh] bg-white rounded-lg border-2 border-slate-100 shadow-inner"
+            title="PDF Viewer"
+          />
         </div>
       </div>
     );

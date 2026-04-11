@@ -14,6 +14,20 @@ const getQuizzesForDocument = async (documentId) => {
   }
 };
 
+const createQuiz = async (documentId, quizData) => {
+  try {
+    const response = await axiosInstance.post(
+      API_PATHS.QUIZZES.CREATE_QUIZ(documentId),
+      quizData
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || {
+      message: 'Failed to create quiz',
+    };
+  }
+};
+
 const getQuizById = async (quizId) => {
   try {
     const response = await axiosInstance.get(
@@ -69,6 +83,7 @@ const deleteQuiz = async (quizId) => {
 
 const quizService = {
   getQuizzesForDocument,
+  createQuiz,
   getQuizById,
   submitQuiz,
   getQuizResults,

@@ -56,14 +56,27 @@ const QuizTakePage = () => {
     setSubmitting(true);
 
     try {
-      const formattedAnswers = Object.keys(selectedAnswers).map((questionId) => {
-        const question = quiz.questions.find(q => q._id === questionId);
-        const questionIndex = quiz.questions.findIndex(q => q._id === questionId);
-        const optionIndex = selectedAnswers[questionId];
-        const selectedAnswer = question.options[optionIndex];
+      const formattedAnswers = Object.keys(selectedAnswers)
+        .map((questionId) => {
+          const question = quiz.questions.find((q) => q._id === questionId);
+          const questionIndex = quiz.questions.findIndex(
+            (q) => q._id === questionId
+          );
 
-        return { questionIndex, selectedAnswer };
-      });
+          if (!question || questionIndex === -1) return null;
+
+          const optionIndex = selectedAnswers[questionId];
+          const selectedAnswer = question.options[optionIndex];
+
+          return { questionIndex, selectedAnswer };
+        })
+        .filter(Boolean);
+
+      if (formattedAnswers.length === 0 && quiz.questions.length > 0) {
+        toast.error("Please answer at least one question before submitting.");
+        setSubmitting(false);
+        return;
+      }
 
       await quizService.submitQuiz(quizId, formattedAnswers);
 
@@ -71,7 +84,9 @@ const QuizTakePage = () => {
       navigate(`/quizzes/${quizId}/results`);
 
     } catch (error) {
-      toast.error(error.message || 'Failed to submit quiz.');
+      console.error('Quiz submission error:', error);
+      const msg = error.error || error.message || 'Failed to submit quiz.';
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }

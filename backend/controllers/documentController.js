@@ -46,7 +46,7 @@ export const uploadDocument = async (req, res, next) => {
       userId: req.user._id,
       title: title.trim(),
       fileName: req.file.originalname,
-      filePath: req.file.path,
+      filePath: req.file.path.replace(/\\/g, '/'),
       fileSize: req.file.size,
       status: 'processing'
     });

@@ -90,8 +90,15 @@ export const submitQuiz = async (req, res, next) => {
     const userAnswers = [];
 
     answers.forEach(({ questionIndex, selectedAnswer }) => {
-      if (questionIndex < quiz.questions.length) {
+      // Ensure questionIndex is valid and within bounds
+      if (questionIndex >= 0 && questionIndex < quiz.questions.length) {
         const question = quiz.questions[questionIndex];
+        
+        if (!question) {
+          console.error(`[Quiz:Submit] Question at index ${questionIndex} not found in quiz ${quiz._id}`);
+          return;
+        }
+
         const isCorrect = selectedAnswer === question.correctAnswer;
 
         if (isCorrect) correctCount++;
@@ -102,6 +109,8 @@ export const submitQuiz = async (req, res, next) => {
           isCorrect,
           answeredAt: new Date()
         });
+      } else {
+        console.warn(`[Quiz:Submit] Invalid questionIndex ${questionIndex} for quiz ${quiz._id}`);
       }
     });
 

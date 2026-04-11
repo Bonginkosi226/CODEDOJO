@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 dotenv.config();
 
@@ -8,19 +8,16 @@ if (!process.env.GEMINI_API_KEY) {
   console.warn('⚠️  WARNING: GEMINI_API_KEY is not set. AI features will fail.');
 }
 
-const ai = process.env.GEMINI_API_KEY
-  ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+const genAI = process.env.GEMINI_API_KEY
+  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
   : null;
 
 const ensureAI = () => {
-  if (!ai) {
+  if (!genAI) {
     throw new Error('GEMINI_API_KEY is not configured. Please set it in your .env file.');
   }
-  return ai;
+  return genAI;
 };
-
-
-
 
 /**
  * Generate flashcards from text
@@ -29,17 +26,14 @@ const ensureAI = () => {
  * @returns {Promise<Array<{question: string, answer: string, difficulty: string}>>}
  */
 export const generateFlashcards = async (text, count = 10) => {
-
   const prompt = `
 You MUST generate EXACTLY ${count} flashcards.
-
 Return ONLY valid JSON.
 Do NOT add markdown.
 Do NOT add explanation.
 Do NOT add extra text.
 
 Format STRICTLY like this:
-
 [
   {
     "question": "string",
@@ -55,22 +49,18 @@ ${text.substring(0, 15000)}
   const maxRetries = 2;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-
     try {
-
-      // ⏳ Timeout protection (15 seconds)
-      // 👉 It runs multiple promises and returns the one that finishes first
+      const model = ensureAI().getGenerativeModel({ model: "gemini-flash-latest" });
+      
       const response = await Promise.race([
-        ensureAI().models.generateContent({
-          model: 'gemini-2.5-flash-lite',
-          contents: prompt
-        }),
+        model.generateContent(prompt),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error('AI timeout')), 15000)
         )
       ]);
 
-      const rawText = response.text.trim();
+      const result = await response.response;
+      const rawText = result.text().trim();
 
       // 🛑 Extract JSON safely
       const jsonStart = rawText.indexOf('[');
@@ -81,7 +71,6 @@ ${text.substring(0, 15000)}
       }
 
       const jsonString = rawText.substring(jsonStart, jsonEnd + 1);
-
       let flashcards = JSON.parse(jsonString);
 
       if (!Array.isArray(flashcards)) {
@@ -104,20 +93,17 @@ ${text.substring(0, 15000)}
         return flashcards;
       }
 
-      // ❌ If not exact count → retry
       if (attempt === maxRetries) {
         throw new Error('AI did not return exact number of cards');
       }
-
     } catch (error) {
+      console.error('Gemini API error:', error);
       if (attempt === maxRetries) {
-        console.error('Gemini API error:', error);
-        throw new Error('Failed to generate flashcards');
+        throw new Error(error.message || 'Failed to generate flashcards');
       }
     }
   }
 };
-
 
 /**
  * Generate quiz questions from text
@@ -125,83 +111,6 @@ ${text.substring(0, 15000)}
  * @param {number} numQuestions - Number of questions
  * @returns {Promise<Array>}
  */
-// export const generateQuiz = async (text, numQuestions = 5) => {
-//   const prompt = `
-// Generate exactly ${numQuestions} multiple choice questions from the following text.
-
-// Format each question as:
-// Q: [Question]
-// 01: [Option 1]
-// 02: [Option 2]
-// 03: [Option 3]
-// 04: [Option 4]
-// C: [Correct option - exactly as written]
-// E: [Brief explanation]
-// D: [Difficulty: easy, medium, or hard]
-
-// Separate questions with " --- "
-
-// Text:
-// ${text.substring(0, 15000)}
-// `;
-
-//   try {
-//     const response = await ai.models.generateContent({
-//       model: 'gemini-2.5-flash-lite',
-//       contents: prompt
-//     });
-
-//     const generatedText = response.text;
-
-//     const questions = [];
-//     const blocks = generatedText.split(' --- ').filter(b => b.trim());
-
-//     for (const block of blocks) {
-//       const lines = block.trim().split('\n');
-
-//       let question = '';
-//       let options = [];
-//       let correctAnswer = '';
-//       let explanation = '';
-//       let difficulty = 'medium';
-
-//       for (const line of lines) {
-//         const trimmed = line.trim();
-
-//         if (trimmed.startsWith('Q:')) {
-//           question = trimmed.substring(2).trim();
-//         } else if (/^0\d:/.test(trimmed)) {
-//           options.push(trimmed.substring(3).trim());
-//         } else if (trimmed.startsWith('C:')) {
-//           correctAnswer = trimmed.substring(2).trim();
-//         } else if (trimmed.startsWith('E:')) {
-//           explanation = trimmed.substring(2).trim();
-//         } else if (trimmed.startsWith('D:')) {
-//           const diff = trimmed.substring(2).trim().toLowerCase();
-//           if (['easy', 'medium', 'hard'].includes(diff)) {
-//             difficulty = diff;
-//           }
-//         }
-//       }
-
-//       if (question && options.length === 4 && correctAnswer) {
-//         questions.push({
-//           question,
-//           options,
-//           correctAnswer,
-//           explanation,
-//           difficulty
-//         });
-//       }
-//     }
-
-//     return questions.slice(0, numQuestions);
-//   } catch (error) {
-//     console.error('Gemini API error:', error);
-//     throw new Error('Failed to generate quiz');
-//   }
-// };
-
 export const generateQuiz = async (text, numQuestions = 5) => {
   const prompt = `
 Generate exactly ${numQuestions} multiple choice questions.
@@ -222,12 +131,10 @@ ${text.substring(0, 8000)}
 `;
 
   try {
-    const response = await ensureAI().models.generateContent({
-      model: 'gemini-2.5-flash-lite',
-      contents: prompt
-    });
-
-    const generatedText = response.text;
+    const model = ensureAI().getGenerativeModel({ model: "gemini-flash-latest" });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const generatedText = response.text();
 
     console.log("RAW OUTPUT:\n", generatedText);
 
@@ -276,11 +183,9 @@ ${text.substring(0, 8000)}
     return questions.slice(0, numQuestions);
   } catch (error) {
     console.error('Gemini API error:', error);
-    throw new Error('Failed to generate quiz');
+    throw new Error(error.message || 'Failed to generate quiz');
   }
 };
-
-
 
 /**
  * Generate document summary
@@ -297,42 +202,22 @@ ${text.substring(0, 20000)}
 `;
 
   try {
-    const response = await ensureAI().models.generateContent({
-      model: 'gemini-2.5-flash-lite',
-      contents: prompt
-    });
-
-    return response.text;
+    const model = ensureAI().getGenerativeModel({ model: "gemini-flash-latest" });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
   } catch (error) {
     console.error('Gemini API error:', error);
-    throw new Error('Failed to generate summary');
+    throw new Error(error.message || 'Failed to generate summary');
   }
 };
 
-
-
-
-
-
-
-
-// 👉 This function:
-
-// Takes a user question
-// Takes document chunks (pieces of text)
-// Sends both to AI
-// AI answers using only that context
-
-// 👉 This concept is called:
-
-// 🧠 Context-based AI / Retrieval-Augmented Generation (RAG)
 /**
  * Chat with document context
  * @param {string} question - User question
  * @param {Array<{content: string}>} chunks - Relevant document chunks
  * @returns {Promise<string>}
  */
-
 export const chatWithContext = async (question, chunks) => {
   const context = chunks
     .map((c, i) => `[Chunk ${i + 1}]\n${c.content}`)
@@ -352,19 +237,15 @@ Answer:
 `;
 
   try {
-    const response = await ensureAI().models.generateContent({
-      model: 'gemini-2.5-flash-lite',
-      contents: prompt
-    });
-
-    return response.text;
+    const model = ensureAI().getGenerativeModel({ model: "gemini-flash-latest" });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
   } catch (error) {
     console.error('Gemini API error:', error);
-    throw new Error('Failed to process chat request');
+    throw new Error(error.message || 'Failed to process chat request');
   }
 };
-
-
 
 /**
  * Explain a specific concept
@@ -382,16 +263,15 @@ ${context.substring(0, 10000)}
 `;
 
   try {
-    const response = await ensureAI().models.generateContent({
-      model: 'gemini-2.5-flash-lite',
-      contents: prompt
-    });
-
-    return response.text;
+    const model = ensureAI().getGenerativeModel({ model: "gemini-flash-latest" });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
   } catch (error) {
     console.error('Gemini API error:', error);
-    throw new Error('Failed to explain concept');
+    throw new Error(error.message || 'Failed to explain concept');
   }
 };
+
 
 
