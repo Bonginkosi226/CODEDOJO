@@ -1,4 +1,5 @@
 import { MistralAI } from "@langchain/mistralai";
+import User from '../models/User.js';
 
 const JAVA_CURRICULUM = `
 ## Java Curriculum Reference (use this to teach concepts in proper order and depth)
@@ -143,16 +144,6 @@ try/except/else/finally. raise Exception(). Custom exceptions.
 ### 12. File I/O
 open(file, mode). with open() as f: for auto-close. .read(), .readline(), .readlines(), .write().
 Modes: 'r', 'w', 'a', 'r+'.
-
-### 1. Hello World & Print
-print() function. Strings in single or double quotes. Multi-line strings with triple quotes.
-
-### 2. Variables & Data Types
-No type declaration needed. Types: int, float, str, bool. type() to check. Dynamic typing.
-Naming: snake_case. Constants in ALL_CAPS by convention.
-
-## FULL JAVA TECHNICAL CONTEXT (Sensei Knowledge Base)
-${`Java programming requires installing two primary components: a JDK and an IDE... (rest of the detailed context provided by the user) ... HashMaps explicitly forbid duplicate keys.`}
 `;
 
 const SYSTEM_PROMPT = `You are **Sensei**, a passionate technical mentor inside CodeDojo Arcade.
@@ -181,6 +172,37 @@ function withTimeout(promise, ms, label) {
     })
   ]);
 }
+
+export const getProgress = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).select('arcadeProgress');
+    res.status(200).json({
+      success: true,
+      data: user.arcadeProgress
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateProgress = async (req, res, next) => {
+  try {
+    const { progress } = req.body;
+    const user = await User.findById(req.user._id);
+    
+    if (progress > user.arcadeProgress) {
+      user.arcadeProgress = progress;
+      await user.save();
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: user.arcadeProgress
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const arcadeChat = async (req, res, next) => {
   try {

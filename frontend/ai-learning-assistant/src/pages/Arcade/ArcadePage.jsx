@@ -10,6 +10,7 @@ import { useTelemetry } from "../../context/TelemetryContext.jsx";
 import MarkdownRenderer from "../../components/common/MarkdownRenderer";
 import CodeEditor from "../../components/common/CodeEditor";
 import arcadeService from "../../services/arcadeService";
+import leaderboardService from "../../services/leaderboardService";
 import { PYTHON_CURRICULUM, JAVA_CURRICULUM } from "../../data/curriculum";
 
 // ─── Progress Bar Component ───
@@ -118,6 +119,21 @@ const DojoPathGame = ({ language, onBack }) => {
 
   const lesson = curriculum[currentIdx];
 
+  // Fetch initial progress
+  useEffect(() => {
+    const fetchProgress = async () => {
+      try {
+        const response = await arcadeService.getProgress();
+        if (response.success) {
+          setCurrentIdx(response.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch progress:", err);
+      }
+    };
+    fetchProgress();
+  }, []);
+
   useEffect(() => {
     if (!showRoadmap) {
       setCode(lesson.initialCode);
@@ -149,14 +165,23 @@ const DojoPathGame = ({ language, onBack }) => {
     askSensei();
   };
 
-  const handleCompileResult = (code, output) => {
+  const handleCompileResult = async (code, output) => {
     const rawOutput = output || "";
     setOutput(rawOutput);
     const success = lesson.validation ? lesson.validation(rawOutput) : false;
     if (success && !isCompleted) {
       setIsCompleted(true);
       track("lesson_complete", lesson.id, { language, xp: lesson.xp });
-      // In a real app, update user XP via API here
+      
+      try {
+        await arcadeService.updateProgress(currentIdx + 1);
+        // Award XP
+        if (lesson.xp) {
+          await leaderboardService.awardXP(lesson.xp, `Completed ${lesson.title}`);
+        }
+      } catch (err) {
+        console.error("Failed to update progress/XP:", err);
+      }
     }
   };
 
@@ -301,9 +326,15 @@ const DojoPathGame = ({ language, onBack }) => {
 
             {isCompleted ? (
               <button 
-                onClick={() => {
+                onClick={async () => {
                   if (currentIdx < curriculum.length - 1) {
-                    setCurrentIdx(prev => prev + 1);
+                    const nextIdx = currentIdx + 1;
+                    setCurrentIdx(nextIdx);
+                    try {
+                      await arcadeService.updateProgress(nextIdx);
+                    } catch (err) {
+                      console.error("Failed to update progress:", err);
+                    }
                   } else {
                     setShowRoadmap(true);
                   }

@@ -12,7 +12,6 @@ const telemetryEventSchema = new mongoose.Schema({
   },
   eventType: {
     type: String,
-    enum: ['page_view', 'click', 'error', 'milestone', 'time_spent', 'quiz_response', 'arcade_action'],
     required: true
   },
   context: {

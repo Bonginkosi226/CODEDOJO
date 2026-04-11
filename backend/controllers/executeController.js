@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import util from 'util';
+import os from 'os';
 
 const execPromise = util.promisify(exec);
 
@@ -15,7 +16,7 @@ export const executeCode = async (req, res) => {
 
   const code = files[0].content;
   const requestId = crypto.randomBytes(8).toString('hex');
-  const tempDir = path.join('/tmp', `exec_${requestId}`);
+  const tempDir = path.join(os.tmpdir(), `codedojo_exec_${requestId}`);
 
   try {
     fs.mkdirSync(tempDir, { recursive: true });

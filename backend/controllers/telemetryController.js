@@ -35,7 +35,7 @@ export const logBulkTelemetry = async (req, res, next) => {
   } catch (error) {
     // We don't want telemetry failures to crash things or throw massive alarms 
     // unless it's a huge issue, but we must call next to handle it.
-    console.error("Telemetry bulk insert error:", error);
-    next(error);
+    console.error("Telemetry bulk insert error:", JSON.stringify(error, null, 2));
+    res.status(400).json({ success: false, error: error.message });
   }
 };

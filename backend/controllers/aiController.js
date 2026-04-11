@@ -423,14 +423,21 @@ export const explainConcept = async (req, res, next) => {
     }
 
     const relevantChunks = findRelevantChunks(
-      document.chunks,
+      document.chunks || [],
       concept,
       3
     );
 
-    const context = relevantChunks
-      .map(c => c.content)
-      .join('\n\n');
+    const context = relevantChunks.length > 0
+      ? relevantChunks.map(c => c.content).join('\n\n')
+      : document.extractedText?.substring(0, 10000) || '';
+
+    if (!context) {
+      return res.status(422).json({
+        success: false,
+        error: 'No context available to explain this concept'
+      });
+    }
 
     const explanation = await geminiService.explainConcept(
       concept,
