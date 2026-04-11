@@ -44,27 +44,30 @@ const DashboardPage = () => {
 }
 
 
-      const stats = [
+        const stats = [
   {
-    label: "Total Documents",
+    label: "Documents",
     value: dashboardData.overview.totalDocuments,
     icon: FileText,
-    gradient: "from-blue-400 to-cyan-500",
+    gradient: "from-blue-400 to-sky-500",
     shadowColor: "shadow-blue-500/25",
+    accent: "text-blue-500"
   },
   {
-    label: "Total Flashcards",
+    label: "Flashcards",
     value: dashboardData.overview.totalFlashcards,
     icon: BookOpen,
-    gradient: "from-purple-400 to-pink-500",
+    gradient: "from-purple-400 to-fuchsia-500",
     shadowColor: "shadow-purple-500/25",
+    accent: "text-purple-500"
   },
   {
-    label: "Total Quizzes",
+    label: "Quizzes",
     value: dashboardData.overview.totalQuizzes,
     icon: BrainCircuit,
     gradient: "from-emerald-400 to-teal-500",
     shadowColor: "shadow-emerald-500/25",
+    accent: "text-emerald-500"
   },
 ];
 
@@ -84,38 +87,39 @@ const DashboardPage = () => {
     </div>
 
     {/* Stats Grid */}
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-5">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 mt-4">
       {stats.map((stat, index) => (
         <div
           key={index}
-          className="group relative bg-white/80 backdrop-blur-xl border border-slate-200/60 rounded-2xl shadow-lg shadow-slate-200/50 p-6 hover:shadow-2xl hover:shadow-slate-300/50 transition-all duration-300 hover:-translate-y-1"
+          className="group relative bg-white border-4 border-slate-200 rounded-[2rem] p-6 shadow-[0_6px_0_theme(colors.slate.200)] hover:shadow-[0_2px_0_theme(colors.slate.200)] hover:translate-y-[4px] transition-all duration-200 cursor-pointer"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-              {stat.label}
-            </span>
-            <div
-              className={`w-11 h-11 rounded-xl bg-gradient-to-br ${stat.gradient} shadow-lg ${stat.shadowColor} flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}
-            >
-              <stat.icon strokeWidth={2} />
+            <div className="flex flex-col">
+              <span className={`text-4xl font-black ${stat.accent} tracking-tight mb-1`}>
+                {stat.value}
+              </span>
+              <span className="text-[13px] font-extrabold text-slate-400 uppercase tracking-widest">
+                {stat.label}
+              </span>
             </div>
-          </div>
-
-          <div className="text-3xl font-semibold text-slate-900 tracking-tight mt-4">
-            {stat.value}
+            <div
+              className={`w-16 h-16 rounded-[1.25rem] bg-gradient-to-br ${stat.gradient} flex items-center justify-center text-white border-2 border-white/20 shadow-[0_4px_0_rgba(0,0,0,0.1)] group-hover:scale-110 transition-transform duration-300`}
+            >
+              <stat.icon size={32} strokeWidth={2.5} />
+            </div>
           </div>
         </div>
       ))}
     </div>
 
     {/* Recent Activity Section */}
-    <div className="bg-white/80 backdrop-blur-xl border border-slate-200/60 rounded-2xl shadow-xl shadow-slate-200/50 p-8">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
-          <Clock className="w-5 h-5 text-slate-600" strokeWidth={2} />
+    <div className="bg-white border-4 border-slate-200 rounded-[2rem] shadow-[0_8px_0_theme(colors.slate.200)] p-8">
+      <div className="flex items-center gap-4 mb-8">
+        <div className="w-12 h-12 rounded-[1rem] bg-amber-100 flex items-center justify-center border-2 border-amber-200 shadow-sm">
+          <Clock className="w-6 h-6 text-amber-500" strokeWidth={3} />
         </div>
-        <h3 className="text-xl font-medium text-slate-900 tracking-tight">
-          Recent Activity
+        <h3 className="text-2xl font-black text-slate-800 tracking-tight">
+          Recent Adventures
         </h3>
       </div>
 
@@ -145,38 +149,40 @@ const DashboardPage = () => {
             .map((activity, index) => (
               <div
                 key={activity.id || index}
-                className="group flex items-center justify-between p-4 rounded-xl bg-slate-50/50 border border-slate-200/60 hover:bg-white hover:border-slate-300/60 hover:shadow-md transition-all duration-200"
+                className="group flex items-center justify-between p-4 rounded-2xl bg-white border-2 border-slate-100 hover:border-slate-300 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-200"
               >
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-3 mb-1">
                     <div
-                      className={`w-2 h-2 rounded-full ${
+                      className={`w-3 h-3 rounded-full shadow-[0_2px_0_rgba(0,0,0,0.1)] ${
                         activity.type === "document"
-                          ? "bg-gradient-to-r from-blue-400 to-cyan-500"
-                          : "bg-gradient-to-r from-emerald-400 to-teal-500"
+                          ? "bg-sky-400"
+                          : "bg-emerald-400"
                       }`}
                     />
-                    <p className="text-sm font-medium text-slate-900 truncate">
+                    <p className="text-[15px] font-bold text-slate-800 truncate">
                       {activity.type === "document"
-                        ? "Accessed Document: "
-                        : "Attempted Quiz: "}
-                      <span className="text-slate-700">
+                        ? "Studied Scroll: "
+                        : "Attempted Challenge: "}
+                      <span className="text-slate-500 font-semibold">
                         {activity.description}
                       </span>
                     </p>
                   </div>
 
-                  <p className="text-xs text-slate-500 pl-4">
-                    {new Date(activity.timestamp).toLocaleString()}
+                  <p className="text-xs font-bold text-slate-400 pl-6 uppercase tracking-wider">
+                    {new Date(activity.timestamp).toLocaleString(undefined, {
+                      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                    })}
                   </p>
                 </div>
 
                 {activity.link && (
                   <a
                     href={activity.link}
-                    className="ml-4 px-4 py-2 text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-all duration-200 whitespace-nowrap"
+                    className="ml-4 px-5 py-2.5 text-sm font-black text-white bg-slate-800 hover:bg-slate-700 active:translate-y-[2px] rounded-xl shadow-[0_4px_0_theme(colors.slate.900)] active:shadow-none transition-all duration-150 whitespace-nowrap"
                   >
-                    View
+                    GO
                   </a>
                 )}
               </div>
