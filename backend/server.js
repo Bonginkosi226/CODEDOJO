@@ -17,6 +17,7 @@ import progressRoutes from './routes/progressRoutes.js';
 import executeRoutes from './routes/executeRoutes.js';
 import arcadeRoutes from './routes/arcadeRoutes.js';
 import leaderboardRoutes from './routes/leaderboardRoutes.js';
+import telemetryRoutes from './routes/telemetryRoutes.js';
 
 // ES6 module __dirname alternative
 const __filename = fileURLToPath(import.meta.url);
@@ -54,6 +55,7 @@ app.use('/api/progress', progressRoutes);
 app.use('/api/execute', executeRoutes);
 app.use('/api/arcade', arcadeRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/telemetry', telemetryRoutes);
 
 // Error handler
 app.use(errorHandler);

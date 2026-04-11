@@ -3,8 +3,10 @@ import Editor from "@monaco-editor/react";
 import { Play, RotateCcw, CheckCircle2, MessageSquare, Terminal } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "axios";
+import { useTelemetry } from "../../context/TelemetryContext.jsx";
 
 const CodeEditor = ({ code, setCode, language = "python", setLanguage, onRun, onCompileResult }) => {
+  const { track } = useTelemetry();
   const [isRunning, setIsRunning] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
   const [output, setOutput] = useState("");
@@ -17,6 +19,7 @@ const CodeEditor = ({ code, setCode, language = "python", setLanguage, onRun, on
 
   const handleAskAI = async () => {
     setIsRunning(true);
+    track('click', 'CodeEditor', { action: 'Ask AI', language });
     toast.success("Code submitted to AI assistant!");
     
     if (onRun) {
@@ -41,6 +44,7 @@ const CodeEditor = ({ code, setCode, language = "python", setLanguage, onRun, on
       });
       const result = response.data.run.output || "Program finished with no output.";
       setOutput(result);
+      track('milestone', 'CodeEditor: Compile Success', { language, outputLength: result.length });
       // Notify parent about the compilation result
       if (onCompileResult) {
         onCompileResult(code, result);
@@ -48,6 +52,7 @@ const CodeEditor = ({ code, setCode, language = "python", setLanguage, onRun, on
     } catch (error) {
       const errorMsg = "Compilation error: " + (error.response?.data?.message || error.message);
       setOutput(errorMsg);
+      track('error', 'CodeEditor: Compile Failure', { language, error: errorMsg });
       if (onCompileResult) {
         onCompileResult(code, errorMsg);
       }

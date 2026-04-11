@@ -1,545 +1,382 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Send, Sparkles, MessageSquare, Code2, ArrowLeft, Gamepad2, Lock, Swords, Target, Puzzle, Trophy, Star } from "lucide-react";
+import { 
+  Send, Sparkles, MessageSquare, Code2, ArrowLeft, 
+  Gamepad2, Lock, Swords, Target, Puzzle, Trophy, 
+  Star, Volume2, VolumeX, ChevronRight, ChevronLeft,
+  CheckCircle2, Play, Info, HelpCircle
+} from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useTelemetry } from "../../context/TelemetryContext.jsx";
 import MarkdownRenderer from "../../components/common/MarkdownRenderer";
 import CodeEditor from "../../components/common/CodeEditor";
 import arcadeService from "../../services/arcadeService";
+import { PYTHON_CURRICULUM, JAVA_CURRICULUM } from "../../data/curriculum";
 
-// ─── Game Card Data ───
-const GAMES = [
-  {
-    id: "crash-course",
-    title: "Crash Course",
-    subtitle: "Master the Basics",
-    description: "A guided journey through programming fundamentals with Sensei.",
-    icon: Target,
-    gradient: "from-orange-400 to-rose-500",
-    shadow: "shadow-orange-500/30",
-    border: "border-orange-300",
-    available: true,
-  },
-  {
-    id: "bug-hunter",
-    title: "Bug Hunter",
-    subtitle: "Find & Fix Bugs",
-    description: "Spot the errors in broken code snippets and fix them before time runs out.",
-    icon: Swords,
-    gradient: "from-red-400 to-pink-500",
-    shadow: "shadow-red-500/30",
-    border: "border-red-300",
-    available: false,
-  },
-  {
-    id: "code-puzzle",
-    title: "Code Puzzle",
-    subtitle: "Arrange the Blocks",
-    description: "Drag and drop code blocks into the correct order to solve the puzzle.",
-    icon: Puzzle,
-    gradient: "from-violet-400 to-purple-500",
-    shadow: "shadow-violet-500/30",
-    border: "border-violet-300",
-    available: false,
-  },
-  {
-    id: "speed-coder",
-    title: "Speed Coder",
-    subtitle: "Race Against Time",
-    description: "Solve rapid-fire coding challenges and climb the leaderboard.",
-    icon: Trophy,
-    gradient: "from-amber-400 to-yellow-500",
-    shadow: "shadow-amber-500/30",
-    border: "border-amber-300",
-    available: false,
-  },
-];
-
-// ─── Arcade Gallery ───
-const ArcadeGallery = ({ onSelectGame }) => {
+// ─── Progress Bar Component ───
+const ProgressBar = ({ current, total }) => {
+  const percentage = ((current + 1) / total) * 100;
   return (
-    <div>
-      <div className="mb-8">
-        <div className="flex items-center gap-4 mb-2">
-          <div className="w-14 h-14 rounded-[1.25rem] bg-gradient-to-br from-orange-400 to-rose-500 flex items-center justify-center text-white shadow-[0_4px_0_theme(colors.rose.600)]">
-            <Gamepad2 size={28} strokeWidth={3} />
-          </div>
-          <div>
-            <h1 className="text-3xl font-black text-slate-800 tracking-tight">Arcade</h1>
-            <p className="text-sm font-bold text-slate-400">Choose your training game</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {GAMES.map((game) => (
-          <button
-            key={game.id}
-            onClick={() => game.available && onSelectGame(game.id)}
-            disabled={!game.available}
-            className={`group relative text-left bg-white border-4 ${game.available ? game.border : 'border-slate-200'} rounded-[2rem] p-6 shadow-[0_6px_0_theme(colors.slate.200)] ${game.available ? 'hover:shadow-[0_2px_0_theme(colors.slate.200)] hover:translate-y-[4px] cursor-pointer' : 'opacity-70 cursor-not-allowed'} transition-all duration-200`}
-          >
-            {!game.available && (
-              <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full">
-                <Lock size={12} className="text-slate-400" />
-                <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Coming Soon</span>
-              </div>
-            )}
-            <div className={`w-16 h-16 rounded-[1.25rem] bg-gradient-to-br ${game.gradient} flex items-center justify-center text-white mb-4 shadow-[0_4px_0_rgba(0,0,0,0.15)] ${game.available ? 'group-hover:scale-110' : ''} transition-transform duration-300`}>
-              <game.icon size={32} strokeWidth={2.5} />
-            </div>
-            <h3 className="text-lg font-black text-slate-800 mb-0.5">{game.title}</h3>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{game.subtitle}</p>
-            <p className="text-sm text-slate-500 leading-snug">{game.description}</p>
-            {game.available && (
-              <div className="mt-4 w-full py-2.5 bg-gradient-to-br from-orange-400 to-rose-500 text-white text-sm font-black rounded-xl text-center shadow-[0_3px_0_theme(colors.rose.600)] group-hover:shadow-[0_1px_0_theme(colors.rose.600)] group-hover:translate-y-[2px] transition-all">
-                PLAY NOW
-              </div>
-            )}
-          </button>
-        ))}
-      </div>
+    <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border-2 border-slate-200">
+      <div 
+        className="h-full bg-gradient-to-r from-emerald-400 to-sky-400 transition-all duration-500 ease-out"
+        style={{ width: `${percentage}%` }}
+      ></div>
     </div>
   );
 };
 
-// ─── Language Picker ───
-const LanguagePicker = ({ onSelect }) => {
+// ─── Arcade Roadmap Component (Simplified for Refactored View) ───
+const ArcadeRoadmap = ({ language, progress, onStart }) => {
+  const curriculum = language === "python" ? PYTHON_CURRICULUM : JAVA_CURRICULUM;
+  
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh]">
-      <div className="w-20 h-20 rounded-[1.5rem] bg-gradient-to-br from-orange-400 to-rose-500 flex items-center justify-center text-white mb-6 shadow-[0_6px_0_theme(colors.rose.600)]">
-        <Target size={40} strokeWidth={3} />
-      </div>
-      <h2 className="text-3xl font-black text-slate-800 mb-2">Crash Course</h2>
-      <p className="text-sm font-bold text-slate-400 mb-8">Pick your weapon of choice</p>
-      <div className="flex gap-6">
-        {[
-          { lang: "python", label: "Python", emoji: "🐍", gradient: "from-sky-400 to-blue-500", shadow: "shadow-blue-500/30" },
-          { lang: "java", label: "Java", emoji: "☕", gradient: "from-orange-400 to-red-500", shadow: "shadow-red-500/30" },
-        ].map((opt) => (
-          <button
-            key={opt.lang}
-            onClick={() => onSelect(opt.lang)}
-            className={`group flex flex-col items-center gap-3 p-8 bg-white border-4 border-slate-200 rounded-[2rem] shadow-[0_6px_0_theme(colors.slate.200)] hover:shadow-[0_2px_0_theme(colors.slate.200)] hover:translate-y-[4px] transition-all duration-200 min-w-[160px]`}
-          >
-            <span className="text-5xl group-hover:scale-110 transition-transform duration-200">{opt.emoji}</span>
-            <span className="text-xl font-black text-slate-800">{opt.label}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-// ─── Crash Course Roadmap ───
-const CURRICULUM_STEPS = [
-  "Hello World",
-  "Variables",
-  "Operators",
-  "Strings",
-  "Input",
-  "Conditionals",
-  "Loops",
-  "Functions",
-  "Data Structures",
-  "OOP",
-];
-
-const ArcadeRoadmap = ({ language, progress = 0, onStart }) => {
-  return (
-    <div className="flex flex-col h-[75vh] bg-white border-4 border-slate-200 rounded-[2rem] shadow-[0_6px_0_theme(colors.slate.200)] flex-1 overflow-hidden relative">
-      <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] bg-[size:24px_24px] opacity-40"></div>
-      
-      <div className="relative z-10 p-8 border-b-4 border-slate-100 flex items-center justify-between bg-white/80 backdrop-blur-sm">
-        <div>
-          <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-            <Gamepad2 className="text-orange-500" />
-            {language === 'python' ? 'Python' : 'Java'} Crash Course
-          </h2>
-          <p className="text-slate-500 font-bold text-sm mt-1">Sensei's Curriculum Path</p>
-        </div>
-        <button
-          onClick={onStart}
-          className="px-6 py-3 bg-gradient-to-br from-amber-400 to-orange-500 text-white font-black rounded-2xl shadow-[0_4px_0_theme(colors.orange.600)] hover:shadow-[0_2px_0_theme(colors.orange.600)] hover:translate-y-[2px] active:translate-y-[4px] active:shadow-none transition-all flex items-center gap-2"
-        >
-          {progress === 0 ? "Start Journey" : "Continue Journey"}
-        </button>
+    <div className="flex flex-col items-center py-8 max-w-4xl mx-auto w-full">
+      <div className="text-center mb-12">
+        <h2 className="text-4xl font-black text-slate-800 mb-4 tracking-tight">
+          The <span className="text-sky-500">{language.toUpperCase()}</span> Path
+        </h2>
+        <p className="text-slate-500 font-bold max-w-lg mx-auto">
+          Master the fundamentals step-by-step with Sensei. Complete challenges to unlock your potential.
+        </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8 relative z-10">
-        <div className="max-w-2xl mx-auto space-y-4">
-          {CURRICULUM_STEPS.map((step, index) => {
-            const isCompleted = index < progress;
-            const isCurrent = index === progress;
-            const isLocked = index > progress;
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full px-4">
+        {curriculum.map((lesson, index) => {
+          const isLocked = index > progress;
+          const isCompleted = index < progress;
+          const isActive = index === progress;
 
-            let badgeColor = "bg-slate-100 text-slate-400 border-slate-200";
-            if (isCompleted) badgeColor = "bg-green-100 text-green-500 border-green-200";
-            if (isCurrent) badgeColor = "bg-amber-100 text-amber-500 border-amber-200 animate-pulse";
-
-            return (
-              <div 
-                key={step} 
-                className={`relative flex items-center gap-6 p-4 rounded-2xl border-4 transition-all duration-300 ${
-                  isCurrent ? 'bg-white border-amber-300 shadow-md transform scale-105' : 
-                  isCompleted ? 'bg-slate-50 border-green-200 opacity-70' : 
-                  'bg-slate-50 border-slate-100 opacity-50'
-                }`}
-              >
-                {/* Connecting Line */}
-                {index !== CURRICULUM_STEPS.length - 1 && (
-                  <div className={`absolute top-full left-[2.25rem] w-1 h-4 -mt-1 ${isCompleted ? 'bg-green-300' : 'bg-slate-200'}`}></div>
-                )}
-                
-                <div className={`w-12 h-12 shrink-0 rounded-2xl border-4 flex items-center justify-center font-black ${badgeColor}`}>
-                  {isCompleted ? <Target size={20} /> : index + 1}
+          return (
+            <div 
+              key={lesson.id}
+              className={`relative overflow-hidden group p-6 rounded-[2rem] border-4 transition-all duration-300 ${
+                isActive ? 'bg-white border-amber-300 shadow-xl scale-105' : 
+                isCompleted ? 'bg-slate-50 border-emerald-200 opacity-80' : 
+                'bg-slate-50 border-slate-100 opacity-50 grayscale'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl border-4 ${
+                  isActive ? 'bg-amber-100 border-amber-400 text-amber-600' :
+                  isCompleted ? 'bg-emerald-100 border-emerald-400 text-emerald-600' :
+                  'bg-slate-200 border-slate-300 text-slate-400'
+                }`}>
+                  {isCompleted ? <Trophy size={20} /> : index + 1}
                 </div>
-                
-                <div className="flex-1">
-                  <h3 className={`text-lg font-black ${isCurrent ? 'text-amber-600' : isCompleted ? 'text-green-600' : 'text-slate-500'}`}>
-                    {step}
-                  </h3>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
-                    {isCompleted ? "Completed" : isCurrent ? "Active Mission" : "Locked"}
-                  </p>
-                </div>
-
-                {isCompleted && (
-                  <div className="shrink-0 text-green-500 bg-green-50 p-2 rounded-xl">
-                    <Star size={16} className="fill-green-500" />
-                  </div>
-                )}
-                {isLocked && <Lock size={16} className="text-slate-300 mr-4" />}
-                {isCurrent && (
-                  <button 
-                    onClick={onStart}
-                    className="shrink-0 bg-amber-400 hover:bg-amber-500 text-white text-xs font-black uppercase px-4 py-2 rounded-xl shadow-[0_2px_0_theme(colors.amber.600)] hover:translate-y-[1px] hover:shadow-[0_1px_0_theme(colors.amber.600)] transition-all"
-                  >
-                    Play
-                  </button>
+                {isActive && (
+                  <span className="px-3 py-1 bg-amber-400 text-white text-[10px] font-black uppercase rounded-full animate-bounce">
+                    Next Up
+                  </span>
                 )}
               </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-};
 
-
-// ─── Crash Course Game ───
-const CrashCourseGame = ({ language, onBack }) => {
-  const { user } = useAuth();
-  const [history, setHistory] = useState([]);
-  const [message, setMessage] = useState("");
-  const [code, setCode] = useState(language === "python" ? "# Write your code here...\n" : "// Write your code here...\n");
-  const [editorLanguage, setEditorLanguage] = useState(language);
-  const [showEditor, setShowEditor] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [showRoadmap, setShowRoadmap] = useState(true);
-  const [arcadeProgress, setArcadeProgress] = useState(0); 
-  const messagesEndRef = useRef(null);
-
-  // Auto-start: AI sends the first lesson if history is empty and roadmap is bypassed
-  useEffect(() => {
-    if (!showRoadmap && history.length === 0) {
-      const startLesson = async () => {
-        setLoading(true);
-        try {
-          const response = await arcadeService.arcadeChat(
-            language,
-            "I'm ready! Please give me a warm Sensei welcome and start teaching the first concept immediately.",
-            []
-          );
-          const assistantMessage = {
-            role: "assistant",
-            content: response.data.answer,
-            timestamp: new Date(),
-          };
-          setHistory([assistantMessage]);
-        } catch (error) {
-          console.error("Arcade start error:", error);
-          setHistory([{ role: "assistant", content: "Oops! Sensei couldn't connect. Please try refreshing the page.", timestamp: new Date() }]);
-        } finally {
-          setLoading(false);
-        }
-      };
-      startLesson();
-    }
-  }, [language, showRoadmap, history.length]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [history]);
-
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!message.trim()) return;
-
-    const userMessage = { role: "user", content: message, timestamp: new Date() };
-    const newHistory = [...history, userMessage];
-    setHistory(newHistory);
-    setMessage("");
-    setLoading(true);
-
-    try {
-      const response = await arcadeService.arcadeChat(language, message, newHistory);
-      const assistantMessage = { role: "assistant", content: response.data.answer, timestamp: new Date() };
-      setHistory((prev) => [...prev, assistantMessage]);
-    } catch (error) {
-      console.error("Arcade chat error:", error);
-      setHistory((prev) => [...prev, { role: "assistant", content: "Sensei ran into an issue. Try again!", timestamp: new Date() }]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const renderMessage = (msg, index) => {
-    const isUser = msg.role === "user";
-
-    return (
-      <div
-        key={index}
-        className={`flex items-start gap-3 my-4 ${isUser ? "justify-end" : ""}`}
-      >
-        {!isUser && (
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-orange-400 to-rose-500 shadow-[0_3px_0_theme(colors.rose.600)] flex items-center justify-center shrink-0">
-            <Sparkles className="w-5 h-5 text-white" strokeWidth={2.5} />
-          </div>
-        )}
-
-        <div
-          className={`max-w-lg p-4 rounded-2xl shadow-sm ${
-            isUser
-              ? "bg-sky-400 text-white border-b-4 border-sky-600 rounded-br-md"
-              : "bg-white border-2 border-slate-200 text-slate-800 rounded-bl-md"
-          }`}
-        >
-          {isUser ? (
-            <p className="text-sm font-bold leading-relaxed">{msg.content}</p>
-          ) : (
-            <div className="prose prose-sm max-w-none prose-slate">
-              <MarkdownRenderer content={msg.content} />
-            </div>
-          )}
-        </div>
-
-        {isUser && (
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-400 to-indigo-500 shadow-[0_3px_0_theme(colors.indigo.600)] flex items-center justify-center text-white font-black text-sm shrink-0">
-            {user?.username?.charAt(0)?.toUpperCase() || "U"}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  return (
-    <div className="h-full flex flex-col">
-      {/* Back button */}
-      <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-slate-700 transition-colors"
-        >
-          <ArrowLeft size={16} />
-          Back to Arcade
-        </button>
-        {!showRoadmap && (
-          <button
-            onClick={() => setShowRoadmap(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 rounded-xl text-xs font-black uppercase transition-colors"
-          >
-            <Gamepad2 size={14} />
-            View Roadmap
-          </button>
-        )}
-      </div>
-
-      {showRoadmap ? (
-        <ArcadeRoadmap 
-          language={language} 
-          progress={arcadeProgress}
-          onStart={() => setShowRoadmap(false)} 
-        />
-      ) : (
-        <div className="flex flex-col lg:flex-row gap-4 flex-1 h-[75vh]">
-          {/* Chat Area */}
-          <div className={`flex flex-col flex-1 bg-white border-4 border-slate-200 rounded-[2rem] shadow-[0_6px_0_theme(colors.slate.200)] overflow-hidden ${!showEditor ? 'lg:w-full' : ''}`}>
-            {/* Chat Header */}
-            <div className="flex items-center justify-between p-4 border-b-4 border-slate-100">
-              <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                <Sparkles size={16} className="text-orange-500" /> Sensei
-                <span className="text-xs font-bold text-slate-400 uppercase ml-1">
-                  ({language})
-                </span>
+              <h3 className={`text-lg font-black mb-1 ${isActive ? 'text-slate-800' : 'text-slate-500'}`}>
+                {lesson.title}
               </h3>
-              <button
-                onClick={() => setShowEditor(!showEditor)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black border-b-4 transition-all active:translate-y-[2px] active:border-b-[2px] ${
-                  showEditor
-                    ? "bg-sky-400 text-white border-sky-600"
-                    : "bg-slate-100 text-slate-500 border-slate-200"
-                }`}
-              >
-                <Code2 size={14} />
-                {showEditor ? "Hide Editor" : "Show Editor"}
-              </button>
-            </div>
+              <p className="text-xs font-bold text-slate-400 mb-6">{lesson.concept}</p>
 
-            <div className="flex-1 p-6 overflow-y-auto">
-              {history.map(renderMessage)}
-              <div ref={messagesEndRef} />
-
-              {loading && (
-                <div className="flex items-center gap-3 my-4">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-orange-400 to-rose-500 shadow-sm flex items-center justify-center shrink-0">
-                    <Sparkles className="w-5 h-5 text-white animate-pulse" strokeWidth={2.5} />
-                  </div>
-                  <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-white border-2 border-slate-200">
-                    <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce"></span>
-                      <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
-                      <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
-                    </div>
-                  </div>
+              {isActive ? (
+                <button 
+                  onClick={() => onStart(index)}
+                  className="w-full py-3 bg-amber-400 hover:bg-amber-500 text-white font-black uppercase rounded-2xl shadow-[0_4px_0_theme(colors.amber.600)] active:shadow-none active:translate-y-[4px] transition-all flex items-center justify-center gap-2"
+                >
+                  <Play size={18} fill="currentColor" />
+                  Enter Dojo
+                </button>
+              ) : isLocked ? (
+                <div className="flex items-center justify-center gap-2 text-slate-400 font-bold text-sm py-3">
+                  <Lock size={16} /> Locked
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-2 text-emerald-500 font-bold text-sm py-3">
+                  <CheckCircle2 size={16} /> Mastery Achieved
                 </div>
               )}
             </div>
-
-            <div className="p-4 border-t-4 border-slate-100">
-              <form onSubmit={handleSendMessage} className="flex items-center gap-3">
-                <input
-                  type="text"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Type your answer or ask Sensei a question..."
-                  className="flex-1 h-12 px-4 border-4 border-slate-200 rounded-2xl bg-white text-slate-900 placeholder-slate-400 text-sm font-bold transition-all duration-200 focus:outline-none focus:border-sky-400"
-                  disabled={loading}
-                />
-                <button
-                  type="submit"
-                  disabled={loading || !message.trim()}
-                  className="shrink-0 w-12 h-12 bg-sky-400 hover:bg-sky-500 active:translate-y-[2px] text-white rounded-2xl transition-all duration-200 shadow-[0_4px_0_theme(colors.sky.600)] active:shadow-none disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  <Send className="w-5 h-5" strokeWidth={2.5} />
-                </button>
-              </form>
-            </div>
-          </div>
-
-          {/* Code Editor */}
-          {showEditor && (
-            <div className="hidden lg:flex flex-1 flex-col h-full">
-              <CodeEditor
-                code={code}
-                setCode={setCode}
-                language={editorLanguage}
-                setLanguage={setEditorLanguage}
-                onRun={async (currentCode) => {
-                  const promptMsg = "Sensei, please review my code:\n\n```" + editorLanguage + "\n" + currentCode + "\n```";
-                  const userMessage = { role: "user", content: promptMsg, timestamp: new Date() };
-                  const newHistory = [...history, userMessage];
-                  setHistory(newHistory);
-                  setLoading(true);
-
-                  try {
-                    const response = await arcadeService.arcadeChat(language, promptMsg, newHistory);
-                    const assistantMessage = { role: "assistant", content: response.data.answer, timestamp: new Date() };
-                    setHistory((prev) => [...prev, assistantMessage]);
-                  } catch (error) {
-                    console.error("Arcade code review error:", error);
-                    setHistory((prev) => [...prev, { role: "assistant", content: "Sensei couldn't review your code. Try again!", timestamp: new Date() }]);
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                onCompileResult={async (compiledCode, compilationOutput) => {
-                  // Auto-send compilation results to Sensei
-                  const promptMsg = "[COMPILATION OUTPUT]\n\nMy code:\n```" + editorLanguage + "\n" + compiledCode + "\n```\n\nOutput:\n```\n" + compilationOutput + "\n```";
-                  const userMessage = { role: "user", content: promptMsg, timestamp: new Date() };
-                  const newHistory = [...history, userMessage];
-                  setHistory(newHistory);
-                  setLoading(true);
-
-                  try {
-                    const response = await arcadeService.arcadeChat(language, promptMsg, newHistory);
-                    const aiAnswer = response.data.answer;
-                    
-                    const assistantMessage = { role: "assistant", content: aiAnswer, timestamp: new Date() };
-                    setHistory((prev) => [...prev, assistantMessage]);
-
-                    // Check if AI congratulates user to advance them and give XP
-                    if (aiAnswer.includes("🎉") || aiAnswer.toLowerCase().includes("great job") || aiAnswer.toLowerCase().includes("correct")) {
-                      try {
-                        import("../../services/leaderboardService").then((module) => {
-                          module.default.awardXP(50, "Completing Arcade Challenge").then((xpRes) => {
-                            if (xpRes.success) {
-                              setArcadeProgress(prev => prev + 1);
-                              console.log("Awarded XP:", xpRes.data);
-                            }
-                          });
-                        });
-                      } catch (xpErr) {
-                        console.error("Failed to auto-award XP:", xpErr);
-                      }
-                    }
-
-                  } catch (error) {
-                    console.error("Arcade auto-review error:", error);
-                    setHistory((prev) => [...prev, { role: "assistant", content: "Sensei couldn't analyze your output. Try again!", timestamp: new Date() }]);
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-              />
-            </div>
-          )}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 };
 
-// ─── Main Arcade Page ───
-const ArcadePage = () => {
-  const [currentView, setCurrentView] = useState("gallery"); // gallery | pick-language | crash-course
-  const [selectedLanguage, setSelectedLanguage] = useState(null);
+// ─── Dojo Path Game (Main Refactored UI) ───
+const DojoPathGame = ({ language, onBack }) => {
+  const { user } = useAuth();
+  const { track } = useTelemetry();
+  const curriculum = language === "python" ? PYTHON_CURRICULUM : JAVA_CURRICULUM;
+  
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [code, setCode] = useState("");
+  const [output, setOutput] = useState("");
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(false);
+  const [showRoadmap, setShowRoadmap] = useState(true);
+  const [isAskingSensei, setIsAskingSensei] = useState(false);
+  const [senseiHelp, setSenseiHelp] = useState("");
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
-  const handleSelectGame = (gameId) => {
-    if (gameId === "crash-course") {
-      setCurrentView("pick-language");
+  const lesson = curriculum[currentIdx];
+
+  useEffect(() => {
+    if (!showRoadmap) {
+      setCode(lesson.initialCode);
+      setIsCompleted(false);
+      setOutput("");
+      setSenseiHelp("");
+      setIsHelpOpen(false);
+      
+      track("lesson_start", lesson.id, { language });
+      
+      if (isVoiceEnabled) {
+        speak(lesson.narrative);
+      }
+    }
+  }, [currentIdx, showRoadmap]);
+
+  const speak = (text) => {
+    if (!isVoiceEnabled) return;
+    window.speechSynthesis.cancel();
+    const cleanText = text.replace(/[*_#`🎯]/g, '').replace(/\[.*?\]/g, '');
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1.0;
+    utterance.pitch = 0.95;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleRunCode = async (currentCode) => {
+    // If user clicks "Ask AI" in the editor, we trigger Sensei's help
+    askSensei();
+  };
+
+  const handleCompileResult = (code, output) => {
+    const rawOutput = output || "";
+    setOutput(rawOutput);
+    const success = lesson.validation ? lesson.validation(rawOutput) : false;
+    if (success && !isCompleted) {
+      setIsCompleted(true);
+      track("lesson_complete", lesson.id, { language, xp: lesson.xp });
+      // In a real app, update user XP via API here
     }
   };
 
-  const handleSelectLanguage = (lang) => {
-    setSelectedLanguage(lang);
-    setCurrentView("crash-course");
+  const askSensei = async () => {
+    setIsAskingSensei(true);
+    setIsHelpOpen(true);
+    try {
+      const prompt = `I am stuck on the lesson: "${lesson.title}". My current code is:\n\`\`\`\n${code}\n\`\`\`\nAnd the output is:\n\`\`\`\n${output}\n\`\`\`\nPlease explain why I might be stuck and provide a helpful mentor-like hint without giving the full answer immediately.`;
+      const response = await arcadeService.arcadeChat(language, prompt, []);
+      setSenseiHelp(response.data.answer);
+    } catch (err) {
+      setSenseiHelp("Sensei is meditating. Please try again in a moment!");
+    } finally {
+      setIsAskingSensei(false);
+    }
   };
 
-  const handleBack = () => {
-    setCurrentView("gallery");
-    setSelectedLanguage(null);
-  };
-
-  if (currentView === "crash-course" && selectedLanguage) {
-    return <CrashCourseGame language={selectedLanguage} onBack={handleBack} />;
+  if (showRoadmap) {
+    return <ArcadeRoadmap language={language} progress={currentIdx} onStart={(idx) => {
+      setCurrentIdx(idx);
+      setShowRoadmap(false);
+    }} />;
   }
 
-  if (currentView === "pick-language") {
-    return (
-      <div>
-        <button
-          onClick={handleBack}
-          className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-slate-700 mb-4 transition-colors"
-        >
-          <ArrowLeft size={16} />
-          Back to Arcade
+  return (
+    <div className="h-full flex flex-col gap-4">
+      {/* Top Header */}
+      <div className="flex items-center justify-between px-2">
+        <button onClick={onBack} className="flex items-center gap-2 text-sm font-black text-slate-400 hover:text-slate-800 transition-all">
+          <ArrowLeft size={18} /> BACK
         </button>
-        <LanguagePicker onSelect={handleSelectLanguage} />
+        <div className="flex-1 max-w-md mx-8">
+          <ProgressBar current={currentIdx} total={curriculum.length} />
+        </div>
+        <button 
+          onClick={() => setShowRoadmap(true)}
+          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 font-black text-xs uppercase rounded-xl transition-all"
+        >
+          MAP
+        </button>
+      </div>
+
+      <div className="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden">
+        {/* Left Side: Lesson Content */}
+        <div className="lg:w-[40%] flex flex-col bg-white border-4 border-slate-200 rounded-[2.5rem] shadow-[0_8px_0_theme(colors.slate.200)] overflow-hidden">
+          <div className="p-6 border-b-4 border-slate-50 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-amber-200 shadow-sm">
+                <img src="/assets/sensei_avatar.png" alt="Sensei" className="w-full h-full object-cover" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-slate-800 leading-tight">{lesson.title}</h2>
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest bg-slate-50 px-2 py-0.5 rounded-md">
+                  Lesson {currentIdx + 1}
+                </span>
+              </div>
+            </div>
+            <button
+               onClick={() => {
+                if (isVoiceEnabled) window.speechSynthesis.cancel();
+                setIsVoiceEnabled(!isVoiceEnabled);
+              }}
+              className={`p-2.5 rounded-2xl transition-all ${
+                isVoiceEnabled ? "bg-amber-100 text-amber-600" : "bg-slate-50 text-slate-400"
+              }`}
+            >
+              {isVoiceEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+            </button>
+          </div>
+
+          <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">
+            <div className="prose prose-slate max-w-none prose-p:font-bold prose-p:text-slate-600 prose-p:leading-relaxed">
+              <MarkdownRenderer content={lesson.narrative} />
+              
+              <div className="mt-8 p-6 bg-slate-900 rounded-3xl overflow-hidden relative">
+                <div className="absolute top-3 right-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">EXAMPLE</div>
+                <code className="text-sky-300 font-mono text-sm whitespace-pre-wrap">{lesson.example}</code>
+              </div>
+
+              <div className="mt-8 p-6 bg-amber-50 rounded-3xl border-2 border-amber-100 border-dashed">
+                <h4 className="flex items-center gap-2 text-amber-700 font-black uppercase text-xs tracking-widest mb-3">
+                  <Target size={16} /> Mission Objective
+                </h4>
+                <p className="text-amber-900 text-sm font-bold leading-relaxed">{lesson.goal}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-slate-50 border-t-4 border-slate-100 flex items-center justify-center gap-2">
+            <button 
+              onClick={askSensei}
+              className="flex items-center gap-2 px-6 py-3 bg-white hover:bg-slate-100 text-slate-600 font-black uppercase text-xs rounded-2xl border-2 border-slate-200 transition-all active:translate-y-1"
+            >
+              <HelpCircle size={16} className="text-rose-400" />
+              Ask Sensei
+            </button>
+          </div>
+        </div>
+
+        {/* Right Side: Editor & Interaction */}
+        <div className="flex-1 flex flex-col gap-6">
+          <div className="flex-1 flex flex-col bg-slate-900 border-4 border-slate-800 rounded-[2.5rem] shadow-[0_8px_0_theme(colors.slate.800)] overflow-hidden">
+            <CodeEditor 
+              code={code}
+              setCode={setCode}
+              language={language}
+              onRun={handleRunCode}
+              onCompileResult={handleCompileResult}
+            />
+          </div>
+
+          {/* Persistent Help Drawer */}
+          {isHelpOpen && (
+             <div className="bg-rose-50 border-4 border-rose-100 rounded-[2rem] p-6 relative animate-in slide-in-from-bottom-4">
+              <button onClick={() => setIsHelpOpen(false)} className="absolute top-4 right-4 text-rose-300 hover:text-rose-500">
+                <ArrowLeft size={20} className="rotate-90" />
+              </button>
+              <h4 className="text-rose-500 font-black text-xs uppercase mb-2 flex items-center gap-2">
+                <Sparkles size={14} /> Sensei's Guidance
+              </h4>
+              {isAskingSensei ? (
+                <div className="flex gap-2 p-2">
+                  <div className="w-2 h-2 bg-rose-300 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-rose-300 rounded-full animate-bounce delay-75"></div>
+                  <div className="w-2 h-2 bg-rose-300 rounded-full animate-bounce delay-150"></div>
+                </div>
+              ) : (
+                <p className="text-rose-900 text-sm font-medium leading-relaxed italic">"{senseiHelp}"</p>
+              )}
+            </div>
+          )}
+
+          {/* Navigation Footer */}
+          <div className="flex items-center justify-between gap-4 p-2">
+            <button 
+              disabled={currentIdx === 0}
+              onClick={() => setCurrentIdx(prev => prev - 1)}
+              className="flex items-center gap-2 px-6 py-4 bg-white hover:bg-slate-50 text-slate-400 font-black uppercase text-xs rounded-2xl border-2 border-slate-200 disabled:opacity-30 disabled:grayscale transition-all"
+            >
+              <ChevronLeft size={18} /> Prev
+            </button>
+
+            {isCompleted ? (
+              <button 
+                onClick={() => {
+                  if (currentIdx < curriculum.length - 1) {
+                    setCurrentIdx(prev => prev + 1);
+                  } else {
+                    setShowRoadmap(true);
+                  }
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-8 py-5 bg-emerald-400 hover:bg-emerald-500 text-white font-black uppercase text-sm rounded-3xl shadow-[0_6px_0_theme(colors.emerald-600)] active:shadow-none active:translate-y-[6px] transition-all animate-pulse duration-1000"
+              >
+                Great Job! Next Lesson <ChevronRight size={20} />
+              </button>
+            ) : (
+              <div className="flex-1 py-5 bg-slate-100 text-slate-400 font-black uppercase text-xs rounded-3xl border-2 border-slate-200 border-dashed flex items-center justify-center gap-2">
+                <Lock size={16} /> Complete Mission to Advance
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Main ArcadePage ───
+const ArcadePage = () => {
+  const [selectedGame, setSelectedGame] = useState(null);
+
+  if (selectedGame) {
+    return (
+      <div className="min-h-screen bg-[#FDFCF8] p-6 font-['Outfit',sans-serif]">
+        <DojoPathGame 
+          language={selectedGame.language} 
+          onBack={() => setSelectedGame(null)} 
+        />
       </div>
     );
   }
 
-  return <ArcadeGallery onSelectGame={handleSelectGame} />;
+  return (
+    <div className="min-h-screen bg-[#FDFCF8] p-8 font-['Outfit',sans-serif]">
+      <header className="max-w-6xl mx-auto mb-12">
+        <h1 className="text-5xl font-black text-slate-800 tracking-tight">CodeDojo <span className="text-amber-400 underline decoration-8 decoration-amber-100 underline-offset-8">Arcade</span></h1>
+        <p className="mt-4 text-slate-500 font-bold text-lg">Pick your practice arena and start the journey.</p>
+      </header>
+      
+      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {[
+          { id: 'py', title: 'Python', icon: <Code2 size={40} />, color: 'bg-sky-500', shadow: 'shadow-sky-700', language: 'python', desc: 'Snake your way through logic.' },
+          { id: 'jv', title: 'Java', icon: <Swords size={40} />, color: 'bg-orange-500', shadow: 'shadow-orange-700', language: 'java', desc: 'Compile your strength.' }
+        ].map((game) => (
+          <button
+            key={game.id}
+            onClick={() => setSelectedGame(game)}
+            className={`${game.color} p-8 rounded-[2.5rem] text-white transition-all transform hover:-translate-y-2 active:translate-y-0 group h-[280px] flex flex-col justify-between shadow-[0_12px_0_rgba(0,0,0,0.2)] hover:shadow-[0_15px_0_rgba(0,0,0,0.2)]`}
+          >
+            <div className="flex justify-between items-start">
+              <div className="bg-white/20 p-4 rounded-3xl backdrop-blur-sm group-hover:scale-110 transition-transform">
+                {game.icon}
+              </div>
+              <ChevronRight className="opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
+            </div>
+            
+            <div className="text-left">
+              <h2 className="text-3xl font-black mb-2">{game.title}</h2>
+              <p className="text-white/80 font-bold text-sm leading-relaxed">{game.desc}</p>
+            </div>
+          </button>
+        ))}
+
+        <div className="bg-slate-50 border-4 border-slate-100 border-dashed p-8 rounded-[2.5rem] flex flex-col items-center justify-center text-slate-300 h-[280px]">
+          <Puzzle size={40} className="mb-4 opacity-50" />
+          <p className="font-black text-sm uppercase tracking-widest">More Games Coming Soon</p>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default ArcadePage;

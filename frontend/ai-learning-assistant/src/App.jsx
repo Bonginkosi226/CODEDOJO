@@ -15,6 +15,7 @@ import ProfilePage from './pages/Profile/ProfilePage';
 import ArcadePage from './pages/Arcade/ArcadePage';
 import LeaderboardPage from './pages/Leaderboard/LeaderboardPage';
 import { useAuth } from './context/AuthContext';
+import { TelemetryProvider } from './context/TelemetryContext';
 
 
 const App = () => {
@@ -30,33 +31,30 @@ const App = () => {
 
    return (
     <Router>
-      <Routes>
-        <Route
-          path="/"
-          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />}
-        />
-        <Route path="/login" element={<LoginPage/>} />
-        <Route path="/register" element={<RegisterPage />} />
-
-        {/* Protected Routes */}
-        <Route element = {<ProtectedRoute />}>
-         <Route path="/dashboard" element={<DashboardPage />} />
-         <Route path="/documents" element={<DocumentListPage />} />
-         <Route path="/documents/:id" element={<DocumentDetailPage />} />
-         <Route path="/flashcards" element={<FlashcardListPage />} />
-         <Route path="/documents/:id/flashcards" element={<FlashcardPage />} />
-         <Route path="/quizzes/:quizId" element={<QuizTakePage />} />
-         <Route path="/quizzes/:quizId/results" element={<QuizResultPage />} />
-         <Route path="/profile" element={<ProfilePage />} />
-         <Route path="/arcade" element={<ArcadePage />} />
-         <Route path="/leaderboard" element={<LeaderboardPage />} />
-       </Route>
-       
-        <Route path="*" element={<NotFoundPage/>} />
-
-      </Routes>
+      <TelemetryProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/documents" element={<DocumentListPage />} />
+            <Route path="/documents/:id" element={<DocumentDetailPage />} />
+            <Route path="/flashcards" element={<FlashcardListPage />} />
+            <Route path="/documents/:id/flashcards" element={<FlashcardPage />} />
+            <Route path="/quizzes/:quizId" element={<QuizTakePage />} />
+            <Route path="/quizzes/:quizId/results" element={<QuizResultPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/arcade" element={<ArcadePage />} />
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
+          </Route>
+          
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </TelemetryProvider>
     </Router>
-   )
+   );
 
 }
 

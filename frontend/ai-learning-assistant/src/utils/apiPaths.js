@@ -64,4 +64,8 @@ export const API_PATHS = {
     GET: "/api/leaderboard",
     AWARD_XP: "/api/leaderboard/xp",
   },
+
+  TELEMETRY: {
+    BULK: "/api/telemetry/bulk",
+  }
 };
