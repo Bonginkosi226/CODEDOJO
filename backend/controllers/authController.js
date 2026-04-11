@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { validationResult } from 'express-validator';
 import User from '../models/User.js';
 
 //Generate JWT token
@@ -13,10 +14,20 @@ const generateToken = (id) => {
 // @access Public
 export const register = async (req, res, next) => {
     try {
+        // Check validation results
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                success: false,
+                error: errors.array().map(e => e.msg).join(', '),
+                statusCode: 400
+            });
+        }
+
         const { username, email, password } = req.body;
 
-        //check if user exist
-        const userExists = await User.findOne({ $or: [{ email }] });
+        //check if user exist (both email AND username)
+        const userExists = await User.findOne({ $or: [{ email }, { username }] });
 
         if(userExists) {
            return res.status(400).json({
@@ -68,6 +79,16 @@ export const register = async (req, res, next) => {
 
 export const login = async (req, res, next) => {
     try {
+        // Check validation results
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                success: false,
+                error: errors.array().map(e => e.msg).join(', '),
+                statusCode: 400
+            });
+        }
+
         const { email, password } = req.body;
        // console.log("REQ PASSWORD:", password);
 

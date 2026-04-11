@@ -103,6 +103,67 @@ const processPDF = async (documentId, filePath) => {
   }
 };
 
+// @desc    Reprocess a failed document (retry PDF extraction)
+// @route   POST /api/documents/:id/reprocess
+// @access  Private
+export const reprocessDocument = async (req, res, next) => {
+  try {
+    const document = await Document.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        error: 'Document not found',
+        statusCode: 404
+      });
+    }
+
+    if (document.status === 'ready' && document.extractedText) {
+      return res.status(400).json({
+        success: false,
+        error: 'Document is already processed',
+        statusCode: 400
+      });
+    }
+
+    // Check if the file still exists
+    try {
+      await fs.access(document.filePath);
+    } catch {
+      return res.status(400).json({
+        success: false,
+        error: 'Original PDF file not found. Please re-upload the document.',
+        statusCode: 400
+      });
+    }
+
+    // Reset status and reprocess
+    await Document.findByIdAndUpdate(document._id, { status: 'processing' });
+
+    console.log(`[Reprocess] Retrying PDF processing for document ${document._id}`);
+
+    processPDF(document._id, document.filePath).catch(async (err) => {
+      console.error(`[Reprocess] Failed for document ${document._id}:`, err.message);
+      try {
+        await Document.findByIdAndUpdate(document._id, { status: 'failed' });
+      } catch (updateError) {
+        console.error('[Reprocess] Failed to update status:', updateError);
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Document reprocessing started. Check back shortly.'
+    });
+  } catch (error) {
+    console.error('[Reprocess] Error:', error.message);
+    next(error);
+  }
+};
+
 // @desc    Get all user documents
 // @route   GET /api/documents
 // @access  Private

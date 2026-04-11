@@ -3,15 +3,21 @@ import { GoogleGenAI } from '@google/genai';
 
 dotenv.config();
 
-// Validate API key
+// Validate API key (warn at startup, throw at call time)
 if (!process.env.GEMINI_API_KEY) {
-  console.error('FATAL ERROR: GEMINI_API_KEY is not set.');
-  process.exit(1);
+  console.warn('⚠️  WARNING: GEMINI_API_KEY is not set. AI features will fail.');
 }
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY
-});
+const ai = process.env.GEMINI_API_KEY
+  ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+  : null;
+
+const ensureAI = () => {
+  if (!ai) {
+    throw new Error('GEMINI_API_KEY is not configured. Please set it in your .env file.');
+  }
+  return ai;
+};
 
 
 
@@ -55,7 +61,7 @@ ${text.substring(0, 15000)}
       // ⏳ Timeout protection (15 seconds)
       // 👉 It runs multiple promises and returns the one that finishes first
       const response = await Promise.race([
-        ai.models.generateContent({
+        ensureAI().models.generateContent({
           model: 'gemini-2.5-flash-lite',
           contents: prompt
         }),
@@ -216,7 +222,7 @@ ${text.substring(0, 8000)}
 `;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await ensureAI().models.generateContent({
       model: 'gemini-2.5-flash-lite',
       contents: prompt
     });
@@ -291,7 +297,7 @@ ${text.substring(0, 20000)}
 `;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await ensureAI().models.generateContent({
       model: 'gemini-2.5-flash-lite',
       contents: prompt
     });
@@ -346,7 +352,7 @@ Answer:
 `;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await ensureAI().models.generateContent({
       model: 'gemini-2.5-flash-lite',
       contents: prompt
     });
@@ -376,7 +382,7 @@ ${context.substring(0, 10000)}
 `;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await ensureAI().models.generateContent({
       model: 'gemini-2.5-flash-lite',
       contents: prompt
     });

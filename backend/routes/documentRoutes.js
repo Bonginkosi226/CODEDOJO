@@ -3,7 +3,8 @@ import {
     uploadDocument,
     getDocuments,
     getDocument,
-    deleteDocument
+    deleteDocument,
+    reprocessDocument
 } from '../controllers/documentController.js';
 
 import protect from '../middleware/auth.js';
@@ -25,5 +26,8 @@ router.get('/:id', getDocument);
 
 // Delete document
 router.delete('/:id', deleteDocument);
+
+// Reprocess a failed document
+router.post('/:id/reprocess', reprocessDocument);
 
 export default router;

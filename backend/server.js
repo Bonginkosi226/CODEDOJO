@@ -22,9 +22,11 @@ const __dirname = path.dirname(__filename);
 // Initialize express app
 const app = express();
 
-// Log all requests
+// Log all requests (skip CORS preflight OPTIONS)
 app.use((req, res, next) => {
-  console.log(`[REQUEST] ${req.method} ${req.url}`);
+  if (req.method !== 'OPTIONS') {
+    console.log(`[REQUEST] ${req.method} ${req.url}`);
+  }
   next();
 });
 

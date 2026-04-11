@@ -23,7 +23,8 @@ const AIActions = () => {
       setIsModalOpen(true);
     } catch (error) {
       console.error(error);
-      toast.error("Failed to generate summary.");
+      const msg = error?.error || error?.message || "Failed to generate summary.";
+      toast.error(msg);
     } finally {
       setLoadingAction(null);
     }
@@ -49,7 +50,8 @@ const AIActions = () => {
       setConcept("");
     } catch (error) {
       console.error(error);
-      toast.error("Failed to explain concept.");
+      const msg = error?.error || error?.message || "Failed to explain concept.";
+      toast.error(msg);
     } finally {
       setLoadingAction(null);
     }

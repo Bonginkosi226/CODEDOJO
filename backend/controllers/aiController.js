@@ -39,6 +39,14 @@ export const generateFlashcards = async (req, res, next) => {
       });
     }
 
+    if (!document.extractedText || !document.extractedText.trim()) {
+      console.error(`[AI:Flashcards] Document ${documentId} has no extracted text`);
+      return res.status(422).json({
+        success: false,
+        error: 'Document has no extracted text. Please re-upload or reprocess the document.'
+      });
+    }
+
     // 3️⃣ Generate flashcards (exactly 10)
     const cards = await geminiService.generateFlashcards(
       document.extractedText,
@@ -73,6 +81,7 @@ export const generateFlashcards = async (req, res, next) => {
     });
 
   } catch (error) {
+    console.error(`[AI:Flashcards] Error for doc ${req.body.documentId}:`, error.message);
     next(error);
   }
 };
@@ -99,6 +108,7 @@ export const generateQuiz = async (req, res, next) => {
     });
 
     if (!document || !document.extractedText) {
+      console.error(`[AI:Quiz] Document ${documentId} not found/ready or has no text`);
       return res.status(404).json({
         success: false,
         error: 'Document not found, not ready, or contains no text'
@@ -172,6 +182,14 @@ export const generateSummary = async (req, res, next) => {
       });
     }
 
+    if (!document.extractedText || !document.extractedText.trim()) {
+      console.error(`[AI:Summary] Document ${documentId} has no extracted text`);
+      return res.status(422).json({
+        success: false,
+        error: 'Document has no extracted text. Please re-upload or reprocess the document.'
+      });
+    }
+
     const summary = await geminiService.generateSummary(
       document.extractedText
     );
@@ -186,6 +204,7 @@ export const generateSummary = async (req, res, next) => {
       message: 'Summary generated successfully'
     });
   } catch (error) {
+    console.error(`[AI:Summary] Error for doc ${req.body.documentId}:`, error.message);
     next(error);
   }
 };

@@ -139,6 +139,35 @@ const DocumentDetailPage = () => {
 
       <PageHeader title={document.data?.title} />
 
+      {/* Document Status Banner */}
+      {document.data?.status === 'failed' && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
+            <span className="text-red-600 text-lg">⚠</span>
+          </div>
+          <div>
+            <h4 className="font-semibold text-red-900">Document Processing Failed</h4>
+            <p className="text-sm text-red-700 mt-1">
+              The PDF text could not be extracted. AI features (summary, chat, flashcards, quiz) are unavailable.
+              Please delete this document and re-upload the PDF.
+            </p>
+          </div>
+        </div>
+      )}
+      {document.data?.status === 'processing' && (
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+            <div className="w-4 h-4 border-2 border-amber-400 border-t-amber-700 rounded-full animate-spin" />
+          </div>
+          <div>
+            <h4 className="font-semibold text-amber-900">Processing Document...</h4>
+            <p className="text-sm text-amber-700 mt-1">
+              The PDF is being analyzed. AI features will be available shortly. Refresh the page to check.
+            </p>
+          </div>
+        </div>
+      )}
+
       <Tabs
         tabs={tabs}
         activeTab={activeTab}
