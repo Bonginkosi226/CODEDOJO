@@ -1,4 +1,10 @@
 const errorHandler = (err, req, res, next) => {
+    // If a response was already started (e.g. by auth middleware), delegate to
+    // Express's default error handler to avoid ERR_HTTP_HEADERS_SENT.
+    if (res.headersSent) {
+        return next(err);
+    }
+
     console.error('SERVER ERROR:', err);
 
     let statusCode = err.statusCode || 500;
