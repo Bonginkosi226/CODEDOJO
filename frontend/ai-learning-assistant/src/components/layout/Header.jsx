@@ -1,9 +1,33 @@
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { Bell, User, Menu } from "lucide-react";
+import { useNotifications } from "../../context/NotificationContext";
+import { Bell, User, Menu, Sparkles, Trophy, Zap, Flame, BookOpen, Check } from "lucide-react";
+
+const ICON_MAP = {
+  sparkles: { icon: Sparkles, bg: "bg-amber-100 text-amber-600" },
+  zap: { icon: Zap, bg: "bg-indigo-100 text-indigo-600" },
+  flame: { icon: Flame, bg: "bg-orange-100 text-orange-600" },
+  trophy: { icon: Trophy, bg: "bg-emerald-100 text-emerald-600" },
+  book: { icon: BookOpen, bg: "bg-sky-100 text-sky-600" }
+};
 
 const Header = ({ toggleSidebar }) => {
   const { user } = useAuth();
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const [showNotifications, setShowNotifications] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <header className="sticky top-0 z-40 w-full h-20 bg-white/95 backdrop-blur-xl border-b-4 border-slate-200">
@@ -20,7 +44,7 @@ const Header = ({ toggleSidebar }) => {
         <div className="hidden md:block"></div>
 
         <div className="flex items-center gap-4">
-          {/* Gamification XP Bar - "Motivation Fuel" */}
+          {/* Gamification XP Bar */}
           <div className="hidden sm:flex items-center gap-3 px-4 py-2 bg-slate-100 rounded-[2rem] border-2 border-slate-200 shadow-sm cursor-pointer hover:-translate-y-1 hover:border-slate-300 transition-all">
             <div className="flex flex-col items-end">
               <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Level 1</span>
@@ -36,14 +60,100 @@ const Header = ({ toggleSidebar }) => {
             </div>
           </div>
 
-          {/* Notification Bell */}
-          <button
-            className="relative inline-flex items-center justify-center w-12 h-12 text-slate-500 hover:text-amber-500 hover:bg-amber-50 active:translate-y-[2px] rounded-2xl transition-all duration-200 group"
-            aria-label="Notifications"
-          >
-            <Bell size={24} strokeWidth={2.5} className="group-hover:-rotate-12 transition-transform duration-200" />
-            <span className="absolute top-2.5 right-2.5 w-3 h-3 bg-rose-500 rounded-full border-2 border-white"></span>
-          </button>
+          {/* Notification Bell Dropdown Container */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setShowNotifications((prev) => !prev)}
+              className="relative inline-flex items-center justify-center w-12 h-12 text-slate-500 hover:text-amber-500 hover:bg-amber-50 active:translate-y-[2px] rounded-2xl transition-all duration-200 group"
+              aria-label="Notifications"
+            >
+              <Bell size={24} strokeWidth={2.5} className="group-hover:-rotate-12 transition-transform duration-200" />
+              {unreadCount > 0 && (
+                <span className="absolute top-2.5 right-2.5 w-3 h-3 bg-rose-500 rounded-full border-2 border-white animate-pulse"></span>
+              )}
+            </button>
+
+            {/* Notifications Popover */}
+            {showNotifications && (
+              <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border-4 border-slate-200 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                {/* Popover Header */}
+                <div className="flex items-center justify-between px-5 py-4 bg-slate-50 border-b-2 border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-slate-800 text-base">Notifications</h3>
+                    {unreadCount > 0 && (
+                      <span className="px-2 py-0.5 text-xs font-bold text-white bg-rose-500 rounded-full">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </div>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={markAllAsRead}
+                      className="text-xs font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1 hover:underline transition-all"
+                    >
+                      <Check size={14} /> Mark all read
+                    </button>
+                  )}
+                </div>
+
+                {/* Notifications List */}
+                <div className="max-h-80 overflow-y-auto divide-y-2 divide-slate-100">
+                  {notifications.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 font-bold text-sm">
+                      No notifications yet!
+                    </div>
+                  ) : (
+                    notifications.map((item) => {
+                      const iconInfo = ICON_MAP[item.iconType] || ICON_MAP.sparkles;
+                      const IconComponent = iconInfo.icon;
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => markAsRead(item.id)}
+                          className={`p-4 flex gap-3 transition-colors cursor-pointer ${
+                            item.unread ? "bg-amber-50/50 hover:bg-amber-50" : "hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className={`w-10 h-10 rounded-2xl ${iconInfo.bg} flex items-center justify-center shrink-0 shadow-sm`}>
+                            <IconComponent size={20} strokeWidth={2.5} />
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <h4 className={`text-xs font-extrabold truncate ${item.unread ? "text-slate-900" : "text-slate-700"}`}>
+                                {item.title}
+                              </h4>
+                              <span className="text-[10px] font-bold text-slate-400 shrink-0">
+                                {item.time}
+                              </span>
+                            </div>
+                            <p className="text-xs font-medium text-slate-500 mt-0.5 line-clamp-2">
+                              {item.message}
+                            </p>
+                          </div>
+
+                          {item.unread && (
+                            <span className="w-2 h-2 rounded-full bg-amber-500 self-center shrink-0"></span>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Popover Footer */}
+                <div className="p-3 bg-slate-50 border-t-2 border-slate-200 text-center">
+                  <Link
+                    to="/notifications"
+                    onClick={() => setShowNotifications(false)}
+                    className="text-xs font-extrabold text-amber-600 hover:text-amber-700 hover:underline inline-flex items-center gap-1"
+                  >
+                    View all notifications →
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* User Profile */}
           <div className="flex items-center gap-3 pl-4 border-l-2 border-slate-200/60 h-10">

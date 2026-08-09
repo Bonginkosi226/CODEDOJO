@@ -11,6 +11,7 @@ import {
   BookOpen, 
   Gamepad2,
   Trophy,
+  Bell,
   ChevronLeft,
   ChevronRight,
   X 
@@ -33,6 +34,7 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
     { to: "/flashcards", icon: BookOpen, text: "Flashcards" },
     { to: "/arcade", icon: Gamepad2, text: "Arcade" },
     { to: "/leaderboard", icon: Trophy, text: "Leaderboard" },
+    { to: "/notifications", icon: Bell, text: "Notifications" },
     { to: "/profile", icon: User, text: "Profile" },
   ];
 
