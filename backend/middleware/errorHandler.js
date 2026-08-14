@@ -29,9 +29,9 @@ const errorHandler = (err, req, res, next) => {
         statusCode = 400;
     }
 
-    // Multer error
-    if (err.name === 'MulterError') {
-        message = `Upload error: ${err.message}`;
+    // Multer error or custom file filter error
+    if (err.name === 'MulterError' || err.message === 'Only PDF files are allowed') {
+        message = err.message === 'Only PDF files are allowed' ? err.message : `Upload error: ${err.message}`;
         statusCode = 400;
     }
 

@@ -16,6 +16,7 @@ const DocumentDetailPage = () => {
   const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("Content");
+  const [reprocessing, setReprocessing] = useState(false);
 
   useEffect(() => {
     const fetchDocumentDetails = async () => {
@@ -32,6 +33,22 @@ const DocumentDetailPage = () => {
 
     fetchDocumentDetails();
   }, [id]);
+
+  const handleReprocess = async () => {
+    setReprocessing(true);
+    try {
+      await documentService.reprocessDocument(id);
+      toast.success("Reprocessing started!");
+      setTimeout(async () => {
+        const data = await documentService.getDocumentById(id);
+        setDocument(data);
+        setReprocessing(false);
+      }, 1500);
+    } catch (err) {
+      toast.error(err.error || err.message || "Failed to reprocess document.");
+      setReprocessing(false);
+    }
+  };
 
   // Helper function to get the full PDF URL
   const getPdfUrl = () => {
@@ -59,7 +76,7 @@ const DocumentDetailPage = () => {
     }
 
     const pdfUrl = getPdfUrl();
-     console.log("PDF URL:", pdfUrl); // ✅ correct place
+    console.log("PDF URL:", pdfUrl);
 
     return (
       <div className="bg-white border border-gray-300 rounded-lg overflow-hidden shadow-sm">
@@ -134,17 +151,25 @@ const DocumentDetailPage = () => {
 
       {/* Document Status Banner */}
       {document.data?.status === 'failed' && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
-            <span className="text-red-600 text-lg">⚠</span>
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
+              <span className="text-red-600 text-lg">⚠</span>
+            </div>
+            <div>
+              <h4 className="font-semibold text-red-900">Document Processing Failed</h4>
+              <p className="text-sm text-red-700 mt-1">
+                The PDF text could not be automatically extracted. Click Retry Processing to generate AI study context.
+              </p>
+            </div>
           </div>
-          <div>
-            <h4 className="font-semibold text-red-900">Document Processing Failed</h4>
-            <p className="text-sm text-red-700 mt-1">
-              The PDF text could not be extracted. AI features (summary, chat, flashcards, quiz) are unavailable.
-              Please delete this document and re-upload the PDF.
-            </p>
-          </div>
+          <button
+            onClick={handleReprocess}
+            disabled={reprocessing}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all shrink-0 active:scale-95 disabled:opacity-50"
+          >
+            {reprocessing ? "Reprocessing..." : "Retry Processing"}
+          </button>
         </div>
       )}
       {document.data?.status === 'processing' && (

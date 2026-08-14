@@ -61,11 +61,23 @@ const getDocumentById = async (id) => {
   }
 };
 
+const reprocessDocument = async (id) => {
+  try {
+    const response = await axiosInstance.post(`/api/documents/${id}/reprocess`);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || {
+      message: 'Failed to reprocess document',
+    };
+  }
+};
+
 const documentService = {
   getDocuments,
   uploadDocument,
   deleteDocument,
   getDocumentById,
+  reprocessDocument,
 };
 
 export default documentService;

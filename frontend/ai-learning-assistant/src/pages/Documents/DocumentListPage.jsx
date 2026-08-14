@@ -41,6 +41,13 @@ const DocumentListPage = () => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      if (!isPdf) {
+        toast.error("Only PDF files (.pdf) are allowed.");
+        e.target.value = "";
+        setUploadFile(null);
+        return;
+      }
       setUploadFile(file);
       setUploadTitle(file.name.replace(/\.[^/.]+$/, ""));
     }
@@ -50,7 +57,13 @@ const DocumentListPage = () => {
     e.preventDefault();
 
     if (!uploadFile || !uploadTitle) {
-      toast.error("Please provide a title and select a file.");
+      toast.error("Please provide a title and select a PDF file.");
+      return;
+    }
+
+    const isPdf = uploadFile.type === "application/pdf" || uploadFile.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      toast.error("Only PDF files (.pdf) are allowed.");
       return;
     }
 
@@ -70,7 +83,8 @@ const DocumentListPage = () => {
       setLoading(true);
       fetchDocuments();
     } catch (error) {
-      toast.error(error.message || "Upload failed.");
+      const errorMessage = error.error || error.message || "Upload failed. Only PDF files are allowed.";
+      toast.error(errorMessage);
     } finally {
       setUploading(false);
     }
@@ -229,7 +243,7 @@ const DocumentListPage = () => {
                         </>
                       )}
                     </p>
-                    <p className="text-xs text-slate-500">PDF up to 10MB</p>
+                    <p className="text-xs font-semibold text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-200 mt-2">Only PDF files (.pdf) up to 10MB supported</p>
                   </div>
                 </div>
               </div>

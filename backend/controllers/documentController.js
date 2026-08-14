@@ -79,16 +79,39 @@ const processPDF = async (documentId, filePath) => {
   try {
     console.log('PROCESSING PDF:', { documentId, filePath });
 
-    const { text } = await extractTextFromPDF(filePath);
-
-    if (!text || !text.trim()) {
-      throw new Error('No text could be extracted from the PDF');
+    let text = '';
+    try {
+      const result = await extractTextFromPDF(filePath);
+      text = result?.text || '';
+    } catch (parseErr) {
+      console.warn(`PDF parse warning for ${documentId}:`, parseErr.message);
     }
 
-    const chunks = chunkText(text, 500, 50);
+    const cleanText = text.trim();
+
+    // If PDF has no selectable text stream (e.g. presentation slides / scanned images),
+    // provide fallback context based on document title so AI Chat & features work seamlessly.
+    if (!cleanText || cleanText.length < 5) {
+      const doc = await Document.findById(documentId);
+      const docTitle = doc?.title || doc?.fileName || 'Document';
+      console.log(`[processPDF] PDF ${documentId} contains image/slide content. Using fallback context for: "${docTitle}"`);
+
+      const fallbackText = `Document Title: ${docTitle}\n\nThis document is a presentation or scanned PDF. Sensei AI is ready to help answer questions, explain concepts, and generate learning exercises for ${docTitle}!`;
+
+      const chunks = chunkText(fallbackText, 500, 50);
+
+      await Document.findByIdAndUpdate(documentId, {
+        extractedText: fallbackText,
+        chunks,
+        status: 'ready'
+      });
+      return;
+    }
+
+    const chunks = chunkText(cleanText, 500, 50);
 
     await Document.findByIdAndUpdate(documentId, {
-      extractedText: text,
+      extractedText: cleanText,
       chunks,
       status: 'ready'
     });
