@@ -52,13 +52,14 @@ useEffect(() => {
 
 
 const handleGenerateFlashcards = async () => {
+  if (generating) return; // prevent double clicks
   setGenerating(true);
   try {
     await aiService.generateFlashcards(documentId);
     toast.success("Flashcards generated successfully!");
     fetchFlashcardSets();
   } catch (error) {
-    toast.error(error.message || "Failed to generate flashcards.");
+    toast.error(error?.error || error?.message || "Failed to generate flashcards.");
   } finally {
     setGenerating(false);
   }

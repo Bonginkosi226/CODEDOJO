@@ -110,7 +110,7 @@ const DocumentDetailPage = () => {
   };
 
   const renderAIActions = () => {
-    return <AIActions />;
+    return <AIActions document={document?.data} />;
   };
 
   const renderFlashcardsTab = () => {

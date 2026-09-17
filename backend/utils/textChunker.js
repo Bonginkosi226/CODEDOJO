@@ -115,70 +115,74 @@ export const chunkText = (text, chunkSize = 500, overlap = 50) => {
 };
 
 
+const STOP_WORDS = new Set([
+    'the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'but',
+    'in', 'with', 'to', 'for', 'of', 'as', 'by', 'this', 'that', 'it',
+    'was', 'are', 'be', 'been', 'have', 'has', 'had', 'do', 'does',
+    'did', 'not', 'no', 'you', 'your', 'i', 'me', 'my', 'we', 'our',
+    'they', 'them', 'their', 'he', 'she', 'his', 'her', 'can', 'could',
+    'would', 'should', 'will', 'about', 'from', 'so', 'if', 'than'
+]);
+
+// Escape a string for use inside a RegExp
+const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
- * Find relevant chunks based on keyword matching
+ * Find relevant chunks by whole-word, case-insensitive matching only —
+ * never matches a query word as a substring of a longer word (so "hy"
+ * cannot match inside "Hyperlink"). Stop words and tokens shorter than
+ * 3 characters are ignored as search terms.
  * @param {Array<Object>} chunks - Array of chunks
  * @param {string} query - Search query
  * @param {number} maxChunks - Maximum chunks to return
  * @returns {Array<Object>}
  */
-export const findRelevantChunks = (chunks, query, maxChunks = 3) => {
+export const findRelevantChunks = (chunks, query, maxChunks = 5) => {
     if (!chunks || chunks.length === 0 || !query) {
         return [];
     }
 
-    const stopWords = new Set([
-        'the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'but',
-        'in', 'with', 'to', 'for', 'of', 'as', 'by', 'this', 'that', 'it'
-    ]);
-
     const queryWords = query
         .toLowerCase()
         .split(/\s+/)
-        .filter(w => w.length > 2 && !stopWords.has(w));
+        .map(w => w.replace(/[^\w'-]/g, ''))
+        .filter(w => w.length >= 3 && !STOP_WORDS.has(w));
 
+    // No usable search terms (e.g. only stop words / short tokens like "hy")
+    // — there is nothing to rank against, so return nothing rather than an
+    // arbitrary slice of the document.
     if (queryWords.length === 0) {
-        return chunks.slice(0, maxChunks).map(chunk => ({
-            content: chunk.content,
-            chunkIndex: chunk.chunkIndex,
-            pageNumber: chunk.pageNumber,
-            _id: chunk._id
-        }));
+        return [];
     }
 
-    const scoredChunks = chunks.map((chunk, index) => {
+    const scoredChunks = chunks.map((chunk) => {
         const content = chunk.content.toLowerCase();
-        const contentWords = content.split(/\s+/).length;
+        const contentWordCount = content.split(/\s+/).length;
         let score = 0;
+        let matchedWords = 0;
 
         for (const word of queryWords) {
-            const exactRegex = new RegExp(`\\b${word}\\b`, 'g');
-            const exactMatches = (content.match(exactRegex) || []).length;
-            score += exactMatches * 3;
-
-            const partialMatches = (content.match(new RegExp(word, 'g')) || []).length;
-            score += Math.max(0, partialMatches - exactMatches) * 1.5;
+            const wordRegex = new RegExp(`\\b${escapeRegExp(word)}\\b`, 'g');
+            const matches = (content.match(wordRegex) || []).length;
+            if (matches > 0) {
+                score += matches * 3;
+                matchedWords += 1;
+            }
         }
 
-        const uniqueWordsFound = queryWords.filter(word =>
-            content.includes(word)
-        ).length;
-
-        if (uniqueWordsFound > 1) {
-            score += uniqueWordsFound * 2;
+        if (matchedWords > 1) {
+            score += matchedWords * 2;
         }
 
-        const normalizedScore = score / Math.sqrt(contentWords);
-        const positionBonus = 1 - (index / chunks.length) * 0.1;
+        const normalizedScore = score / Math.sqrt(contentWordCount);
 
         return {
             content: chunk.content,
             chunkIndex: chunk.chunkIndex,
             pageNumber: chunk.pageNumber,
             _id: chunk._id,
-            score: normalizedScore * positionBonus,
-            rawScore: score,
-            matchedWords: uniqueWordsFound
+            score: normalizedScore,
+            matchedWords
         };
     });
 

@@ -1,30 +1,33 @@
 import React, { useState } from "react";
 import { useParams } from "react-router-dom";
-import { Sparkles, BookOpen, Lightbulb } from "lucide-react";
+import { Sparkles, BookOpen, Lightbulb, RefreshCw } from "lucide-react";
 import aiService from "../../services/aiService";
 import toast from "react-hot-toast";
 import MarkdownRenderer from "../common/MarkdownRenderer";
 import Modal from "../common/Modal"; // ✅ FIXED: Added missing import
 
-const AIActions = () => {
+const FRIENDLY_AI_ERROR = "The AI is busy right now. Please try again in a moment.";
+
+const AIActions = ({ document }) => {
   const { id: documentId } = useParams();
   const [loadingAction, setLoadingAction] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalContent, setModalContent] = useState("");
   const [modalTitle, setModalTitle] = useState("");
   const [concept, setConcept] = useState("");
+  const [summary, setSummary] = useState(document?.summary || "");
+  const [summaryGeneratedAt, setSummaryGeneratedAt] = useState(document?.summaryGeneratedAt || null);
 
-  const handleGenerateSummary = async () => {
+  const handleGenerateSummary = async (regenerate = false) => {
+    if (loadingAction) return; // prevent double clicks
     setLoadingAction("summary");
     try {
-      const { summary } = await aiService.generateSummary(documentId);
-      setModalTitle("Generated Summary");
-      setModalContent(summary);
-      setIsModalOpen(true);
+      const data = await aiService.generateSummary(documentId, regenerate);
+      setSummary(data.summary);
+      setSummaryGeneratedAt(data.generatedAt);
     } catch (error) {
       console.error(error);
-      const msg = error?.error || error?.message || "Failed to generate summary.";
-      toast.error(msg);
+      toast.error(error?.error || FRIENDLY_AI_ERROR);
     } finally {
       setLoadingAction(null);
     }
@@ -38,6 +41,8 @@ const AIActions = () => {
       return;
     }
 
+    if (loadingAction) return; // prevent double clicks
+
     setLoadingAction("explain");
     try {
       const { explanation } = await aiService.explainConcept(
@@ -50,8 +55,7 @@ const AIActions = () => {
       setConcept("");
     } catch (error) {
       console.error(error);
-      const msg = error?.error || error?.message || "Failed to explain concept.";
-      toast.error(msg);
+      toast.error(error?.error || FRIENDLY_AI_ERROR);
     } finally {
       setLoadingAction(null);
     }
@@ -90,28 +94,43 @@ const AIActions = () => {
                     />
                   </div>
                   <h4 className="font-semibold text-slate-900">
-                    Generate Summary
+                    Document Summary
                   </h4>
                 </div>
                 <p className="text-sm text-slate-600 leading-relaxed">
-                  Get a concise summary of the entire document:
+                  {summary
+                    ? summaryGeneratedAt
+                      ? `Generated ${new Date(summaryGeneratedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                      : "Saved summary"
+                    : "Get a concise summary of the entire document:"}
                 </p>
               </div>
               <button
-                onClick={handleGenerateSummary}
+                onClick={() => handleGenerateSummary(!!summary)}
                 disabled={loadingAction === "summary"}
                 className="shrink-0 h-10 px-5 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white text-sm font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-teal-500/25 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
               >
                 {loadingAction === "summary" ? (
                   <span className="flex items-center gap-2">
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Loading...
+                    {summary ? "Regenerating..." : "Loading..."}
+                  </span>
+                ) : summary ? (
+                  <span className="flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4" strokeWidth={2} />
+                    Regenerate
                   </span>
                 ) : (
                   "Summarize"
                 )}
               </button>
             </div>
+
+            {summary && (
+              <div className="mt-4 p-4 bg-white rounded-lg border border-slate-200/60 prose prose-sm max-w-none prose-slate">
+                <MarkdownRenderer content={summary} />
+              </div>
+            )}
           </div>
 
           {/* Explain Concept */}

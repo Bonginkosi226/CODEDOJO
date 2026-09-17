@@ -1,7 +1,7 @@
 import Document from '../models/Document.js';
 import Flashcard from '../models/Flashcard.js';
 import Quiz from '../models/Quiz.js';
-import { extractTextFromPDF } from '../utils/pdfParser.js';
+import { extractTextFromPDF, cleanExtractedText } from '../utils/pdfParser.js';
 import { chunkText } from '../utils/textChunker.js';
 import fs from 'fs/promises';
 
@@ -87,7 +87,7 @@ const processPDF = async (documentId, filePath) => {
       console.warn(`PDF parse warning for ${documentId}:`, parseErr.message);
     }
 
-    const cleanText = text.trim();
+    const cleanText = cleanExtractedText(text);
 
     // If PDF has no selectable text stream (e.g. presentation slides / scanned images),
     // provide fallback context based on document title so AI Chat & features work seamlessly.

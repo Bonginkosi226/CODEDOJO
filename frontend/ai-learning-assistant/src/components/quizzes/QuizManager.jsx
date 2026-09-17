@@ -42,6 +42,7 @@ const QuizManager = ({ documentId }) => {
 
   const handleGenerateQuiz = async (e) => {
     e.preventDefault();
+    if (generating) return; // prevent double clicks
     setGenerating(true);
     try {
       await aiService.generateQuiz(documentId, { numQuestions });
@@ -49,7 +50,7 @@ const QuizManager = ({ documentId }) => {
       setIsGenerateModalOpen(false);
       fetchQuizzes();
     } catch (error) {
-      toast.error(error.message || 'Failed to generate quiz.');
+      toast.error(error?.error || error?.message || 'Failed to generate quiz.');
       setIsGenerateModalOpen(false);
     } finally {
       setGenerating(false);

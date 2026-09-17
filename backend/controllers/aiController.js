@@ -3,9 +3,20 @@ import Flashcard from '../models/Flashcard.js';
 import Quiz from '../models/Quiz.js';
 import ChatHistory from '../models/ChatHistory.js';
 
-import * as geminiService from '../utils/geminiService.js';
-import * as mistralService from '../utils/mistralService.js';
+import * as aiService from '../services/aiService.js';
+import { AIServiceError } from '../services/aiService.js';
 import { findRelevantChunks } from '../utils/textChunker.js';
+
+// No controller should call Gemini/Mistral directly — every AI feature goes
+// through aiService, which handles timeouts, retry, and provider fallback.
+// If both providers fail, aiService throws AIServiceError with a friendly
+// message; we surface that as a real 503, never a raw provider error.
+const sendAIError = (error, res, next) => {
+  if (error instanceof AIServiceError) {
+    return res.status(503).json({ success: false, error: error.message });
+  }
+  next(error);
+};
 
 
 /**
@@ -49,7 +60,7 @@ export const generateFlashcards = async (req, res, next) => {
     }
 
     // 3️⃣ Generate flashcards (exactly 10)
-    const cards = await mistralService.generateFlashcards(
+    const cards = await aiService.generateFlashcards(
       document.extractedText,
       count
     );
@@ -83,7 +94,7 @@ export const generateFlashcards = async (req, res, next) => {
 
   } catch (error) {
     console.error(`[AI:Flashcards] Error for doc ${req.body.documentId}:`, error.message);
-    next(error);
+    sendAIError(error, res, next);
   }
 };
 /**
@@ -116,8 +127,8 @@ export const generateQuiz = async (req, res, next) => {
       });
     }
 
-    // Generate quiz using Mistral
-    const questions = await mistralService.generateQuiz(
+    // Generate quiz
+    const questions = await aiService.generateQuiz(
       document.extractedText,
       parseInt(numQuestions)
     );
@@ -151,7 +162,7 @@ export const generateQuiz = async (req, res, next) => {
     });
   } catch (error) {
     console.error("Quiz Generation Error:", error); // Log the actual error for debugging
-    next(error);
+    sendAIError(error, res, next);
   }
 };
 /**
@@ -161,7 +172,7 @@ export const generateQuiz = async (req, res, next) => {
  */
 export const generateSummary = async (req, res, next) => {
   try {
-    const { documentId } = req.body;
+    const { documentId, regenerate } = req.body;
 
     if (!documentId) {
       return res.status(400).json({
@@ -183,6 +194,22 @@ export const generateSummary = async (req, res, next) => {
       });
     }
 
+    // Serve the saved summary instead of calling the AI again, unless the
+    // user explicitly asked to regenerate it.
+    if (document.summary && !regenerate) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          documentId: document._id,
+          title: document.title,
+          summary: document.summary,
+          generatedAt: document.summaryGeneratedAt,
+          cached: true
+        },
+        message: 'Summary retrieved'
+      });
+    }
+
     if (!document.extractedText || !document.extractedText.trim()) {
       console.error(`[AI:Summary] Document ${documentId} has no extracted text`);
       return res.status(422).json({
@@ -191,22 +218,28 @@ export const generateSummary = async (req, res, next) => {
       });
     }
 
-    const summary = await geminiService.generateSummary(
+    const summary = await aiService.generateSummary(
       document.extractedText
     );
+
+    document.summary = summary;
+    document.summaryGeneratedAt = new Date();
+    await document.save();
 
     res.status(200).json({
       success: true,
       data: {
         documentId: document._id,
         title: document.title,
-        summary
+        summary,
+        generatedAt: document.summaryGeneratedAt,
+        cached: false
       },
       message: 'Summary generated successfully'
     });
   } catch (error) {
     console.error(`[AI:Summary] Error for doc ${req.body.documentId}:`, error.message);
-    next(error);
+    sendAIError(error, res, next);
   }
 };
 
@@ -352,11 +385,19 @@ export const chat = async (req, res, next) => {
       });
     }
 
-    // ✅ 4️⃣ NEW: Use LangChain instead of manual chunking
-    const answer = await askQuestionFromText(
-      document.extractedText,
-      question
-    );
+    // ✅ 4️⃣ Ask via LangChain — keyword-matched chunks + last 10 turns of
+    // this document's history, so follow-ups like "I don't know" make sense.
+    const recentHistory = chatHistory.messages.slice(-10).map((m) => ({
+      role: m.role,
+      content: m.content
+    }));
+
+    const answer = await askQuestionFromText({
+      question,
+      chunks: document.chunks,
+      text: document.extractedText,
+      history: recentHistory
+    });
 
     // 5️⃣ Save conversation
     chatHistory.messages.push(
@@ -390,7 +431,7 @@ export const chat = async (req, res, next) => {
 
   } catch (error) {
     console.error("Chat Error:", error);
-    next(error);
+    sendAIError(error, res, next);
   }
 };
 
@@ -440,7 +481,7 @@ export const explainConcept = async (req, res, next) => {
       });
     }
 
-    const explanation = await geminiService.explainConcept(
+    const explanation = await aiService.explainConcept(
       concept,
       context
     );
@@ -455,7 +496,7 @@ export const explainConcept = async (req, res, next) => {
       message: 'Explanation generated successfully'
     });
   } catch (error) {
-    next(error);
+    sendAIError(error, res, next);
   }
 };
 

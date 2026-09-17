@@ -76,7 +76,7 @@ const ChatInterface = () => {
 
       const errorMessage = {
         role: "assistant",
-        content: "Sorry, I encountered an error. Please try again.",
+        content: error?.error || "The assistant is unavailable right now, please try again",
         timestamp: new Date(),
       };
 

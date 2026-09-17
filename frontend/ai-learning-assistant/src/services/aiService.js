@@ -29,11 +29,11 @@ const generateQuiz = async (documentId, options = {}) => {
   }
 };
 
-const generateSummary = async (documentId) => {
+const generateSummary = async (documentId, regenerate = false) => {
   try {
     const response = await axiosInstance.post(
       API_PATHS.AI.GENERATE_SUMMARY,
-      { documentId }
+      { documentId, regenerate }
     );
     return response.data?.data;
   } catch (error) {

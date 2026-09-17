@@ -27,6 +27,14 @@ const documentSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
+    summary: {
+        type: String,
+        default: ''
+    },
+    summaryGeneratedAt: {
+        type: Date,
+        default: null
+    },
     chunks: [{
         content: {
             type: String,

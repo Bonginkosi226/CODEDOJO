@@ -2,8 +2,7 @@ import User from '../models/User.js';
 import { findLessonById } from '../data/arcadeLessons.js';
 import { evaluateSubmission, STATUS } from '../services/missionChecker.js';
 import { calculateLevel } from '../utils/xpUtils.js';
-import * as geminiService from '../utils/geminiService.js';
-import * as mistralService from '../utils/mistralService.js';
+import { chat as aiChat, AIServiceError } from '../services/aiService.js';
 
 const JAVA_CURRICULUM = `
 ## Java Curriculum Reference (use this to teach concepts in proper order and depth)
@@ -335,36 +334,7 @@ export const arcadeChat = async (req, res, next) => {
     // Keep history bounded to keep context manageable
     const recentHistory = history.slice(-30);
 
-    let answer;
-    let lastError;
-
-    // Try Gemini first, then fall back to Mistral. Only if BOTH fail do we
-    // return a real error instead of a fake successful empty reply.
-    if (process.env.GEMINI_API_KEY) {
-      try {
-        answer = await geminiService.senseiChat(systemPrompt, question, recentHistory);
-      } catch (err) {
-        console.error('[Arcade] Sensei Gemini error:', err.message);
-        lastError = err;
-      }
-    }
-
-    if (!answer && process.env.MISTRAL_API_KEY) {
-      try {
-        answer = await mistralService.senseiChat(systemPrompt, question, recentHistory);
-      } catch (err) {
-        console.error('[Arcade] Sensei Mistral error:', err.message);
-        lastError = err;
-      }
-    }
-
-    if (!answer) {
-      console.error('[Arcade] Sensei unavailable, both providers failed:', lastError?.message);
-      return res.status(503).json({
-        success: false,
-        error: 'Sensei is unavailable right now, please try again',
-      });
-    }
+    const answer = await aiChat({ systemPrompt, question, history: recentHistory });
 
     res.status(200).json({
       success: true,
@@ -372,6 +342,12 @@ export const arcadeChat = async (req, res, next) => {
     });
 
   } catch (error) {
+    if (error instanceof AIServiceError) {
+      return res.status(503).json({
+        success: false,
+        error: 'Sensei is unavailable right now, please try again',
+      });
+    }
     next(error);
   }
 };
