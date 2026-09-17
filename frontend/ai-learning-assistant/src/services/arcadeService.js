@@ -37,10 +37,22 @@ const updateProgress = async (progress) => {
   }
 };
 
+const submitLesson = async (lessonId, code) => {
+  try {
+    const response = await axiosInstance.post(API_PATHS.ARCADE.SUBMIT_LESSON(lessonId), { code });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || {
+      message: 'Failed to submit mission',
+    };
+  }
+};
+
 const arcadeService = {
   arcadeChat,
   getProgress,
   updateProgress,
+  submitLesson,
 };
 
 export default arcadeService;

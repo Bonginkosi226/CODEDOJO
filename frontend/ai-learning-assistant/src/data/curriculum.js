@@ -8,8 +8,7 @@ export const PYTHON_CURRICULUM = [
 Think of it like a megaphone: whatever you put inside the parentheses (and quotes), Python will shout out to the console.`,
     example: `print("Hello, World!")`,
     goal: "Try printing your own name to the console using the print() function.",
-    initialCode: "print(\"Change this text!\")\n",
-    validation: (output) => output && output.length > 0 && !output.toLowerCase().includes("error"),
+    initialCode: "# Your code goes here\n",
     xp: 50
   },
   {
@@ -22,7 +21,6 @@ Think of a variable as a labeled storage bin. You give it a name, and put a valu
     example: `name = "Sensei"\nprint(name)`,
     goal: "Create a variable called 'hero' and assign it your favorite superhero's name, then print it.",
     initialCode: "# Create your variable here\n\n# Print it here\n",
-    validation: (output) => output && output.length > 0 && !output.toLowerCase().includes("error"),
     xp: 75
   }
 ];
@@ -38,7 +36,6 @@ First, your source code is turned into **Bytecode**. Then, the **Java Virtual Ma
     example: `public class Main {\n  public static void main(String[] args) {\n    System.out.println("Powered by JVM");\n  }\n}`,
     goal: "Run this class to see the JVM in action. Notice the '.java' file becomes '.class' bytecode behind the scenes!",
     initialCode: "public class Main {\n  public static void main(String[] args) {\n    System.out.println(\"Hello from the JVM!\");\n  }\n}\n",
-    validation: (output) => output && output.includes("Hello from the JVM!"),
     xp: 50
   },
   {
@@ -51,7 +48,6 @@ Every program needs a \`main\` method as its entry point. Statements MUST end wi
     example: `public class Main {\n  public static void main(String[] args) {\n    System.out.print("Line 1");\n    System.out.println(" Line 2");\n  }\n}`,
     goal: "Use System.out.println() to print two different messages on two separate lines.",
     initialCode: "public class Main {\n  public static void main(String[] args) {\n    // Print your first line here\n\n    // Print your second line here\n  }\n}\n",
-    validation: (output) => output && output.split("\n").filter(l => l.trim().length > 0).length >= 2,
     xp: 60
   },
   {
@@ -64,7 +60,6 @@ Every program needs a \`main\` method as its entry point. Statements MUST end wi
     example: `int age = 25;\ndouble price = 19.99F; // Wait, floats need F, doubles don't\ndouble tax = 0.15;`,
     goal: "Declare an 'int' named 'score' and a 'double' named 'bonus', then print their sum.",
     initialCode: "public class Main {\n  public static void main(String[] args) {\n    int score = 100;\n    // Declare your double here\n\n    // Print score + bonus\n  }\n}\n",
-    validation: (output) => output && !output.toLowerCase().includes("error") && output.length > 0,
     xp: 75
   },
   {
@@ -76,8 +71,7 @@ Every program needs a \`main\` method as its entry point. Statements MUST end wi
 To turn a String into a number, we use **Wrapper Classes** like \`Integer.parseInt()\`.`,
     example: `double myDouble = 9.78;\nint myInt = (int) myDouble; // myInt is 9\nint converted = Integer.parseInt("123");`,
     goal: "Explicitly cast the double 45.99 into an integer and print the result.",
-    initialCode: "public class Main {\n  public static void main(String[] args) {\n    double pi = 3.14159;\n    // Cast pi to an int and print it\n  }\n}\n",
-    validation: (output) => output && output.includes("3") && !output.includes("3.14"),
+    initialCode: "public class Main {\n  public static void main(String[] args) {\n    double price = 45.99;\n    // Cast price to an int and print it\n  }\n}\n",
     xp: 80
   },
   {
@@ -90,7 +84,6 @@ Use \`.length()\` to get size, and \`.equals()\` to compare text. Never use \`==
     example: `String name = " Dojo ";\nSystem.out.println(name.trim().toUpperCase());`,
     goal: "Get the length of the string 'CodeDojo Arcade' and print it to the console.",
     initialCode: "public class Main {\n  public static void main(String[] args) {\n    String title = \"CodeDojo Arcade\";\n    // Print the length of title using .length()\n  }\n}\n",
-    validation: (output) => output && output.includes("15"),
     xp: 70
   },
   {
@@ -103,7 +96,6 @@ Methods: \`round()\`, \`ceil()\` (up), \`floor()\` (down), \`pow(base, exp)\`, a
     example: `double result = Math.pow(2, 3); // 8.0\nlong rounded = Math.round(5.4); // 5`,
     goal: "Calculate the square root of 64 using Math.sqrt() and print it.",
     initialCode: "public class Main {\n  public static void main(String[] args) {\n    // Use Math.sqrt(64) and print the result\n  }\n}\n",
-    validation: (output) => output && output.includes("8.0"),
     xp: 80
   },
   {
@@ -116,7 +108,6 @@ This eliminates the need for \`break\` statements and makes the code much cleane
     example: `String day = "Saturday";\nswitch(day) {\n  case "Saturday", "Sunday" -> System.out.println("Weekend!");\n  default -> System.out.println("Weekday.");\n}`,
     goal: "Create a switch statement that prints 'Even' if a variable 'num' is 2, 4, or 6.",
     initialCode: "public class Main {\n  public static void main(String[] args) {\n    int num = 4;\n    // Use an enhanced switch arrow on 'num'\n  }\n}\n",
-    validation: (output) => output && output.toLowerCase().includes("even"),
     xp: 90
   },
   {
@@ -127,9 +118,8 @@ This eliminates the need for \`break\` statements and makes the code much cleane
 
 \`for (int i = 0; i < 5; i++)\` is the heart of most iteration in Java.`,
     example: `for (int i = 0; i < 3; i++) {\n  System.out.println("Iteration " + i);\n}`,
-    goal: "Write a for loop that prints the numbers from 1 to 5.",
+    goal: "Write a for loop that prints the numbers 1 to 5, each on its own line.",
     initialCode: "public class Main {\n  public static void main(String[] args) {\n    // Write your for loop here\n  }\n}\n",
-    validation: (output) => output && output.includes("1") && output.includes("5"),
     xp: 85
   },
   {
@@ -141,8 +131,7 @@ This eliminates the need for \`break\` statements and makes the code much cleane
 Note: ArrayLists require **Wrapper Classes** (like \`Integer\`) because they only store objects, not raw primitives.`,
     example: `ArrayList<String> list = new ArrayList<>();\nlist.add("Java");\nSystem.out.println(list.get(0));`,
     goal: "Create an ArrayList of Strings named 'items', add 'Computer' to it, and print the size of the list.",
-    initialCode: "import java.util.ArrayList;\n\npublic class Main {\n  public static void main(String[] args) {\n    // Initialize ArrayList<String> items here\n\n    // Add \"Computer\"\n\n    // Print items.size()\n  }\n}\n",
-    validation: (output) => output && output.includes("1"),
+    initialCode: "import java.util.ArrayList;\n\npublic class Main {\n  public static void main(String[] args) {\n    // Create the ArrayList named 'items' here\n\n    // Add \"Computer\" to items\n\n    // Print the number of items in the list\n  }\n}\n",
     xp: 95
   },
   {
@@ -155,7 +144,6 @@ Use the \`new\` keyword to instantiate an object!`,
     example: `class Dog {\n  String breed;\n  void bark() { System.out.println("Woof!"); }\n}\n\nDog myDog = new Dog();\nmyDog.bark();`,
     goal: "In the main method, create an instance of the class 'Main' (using new Main()) and print its generic toString() result.",
     initialCode: "public class Main {\n  public static void main(String[] args) {\n    // Create a new instance of Main here\n    \n    // System.out.println(yourInstance);\n  }\n}\n",
-    validation: (output) => output && output.includes("Main@"),
     xp: 100
   }
 ];

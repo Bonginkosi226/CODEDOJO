@@ -248,6 +248,39 @@ Answer:
 };
 
 /**
+ * Sensei mentor chat (Arcade). Uses Gemini's systemInstruction + multi-turn
+ * chat history (roles: "user" / "model") — not a hand-formatted text prompt.
+ * @param {string} systemPrompt - Sensei persona + curriculum reference
+ * @param {string} question - The student's current question
+ * @param {Array<{role: string, content: string}>} history - Prior turns (role: "user" | "assistant")
+ * @returns {Promise<string>}
+ */
+export const senseiChat = async (systemPrompt, question, history = []) => {
+  const model = ensureAI().getGenerativeModel({
+    model: 'gemini-flash-latest',
+    systemInstruction: systemPrompt,
+  });
+
+  const chatHistory = history.map((msg) => ({
+    role: msg.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: msg.content }],
+  }));
+
+  const chatSession = model.startChat({ history: chatHistory });
+
+  const result = await Promise.race([
+    chatSession.sendMessage(question),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Gemini timeout')), 15000)),
+  ]);
+
+  const text = result.response.text();
+  if (!text || !text.trim()) {
+    throw new Error('Gemini returned an empty response');
+  }
+  return text.trim();
+};
+
+/**
  * Explain a specific concept
  * @param {string} concept - Concept to explain
  * @param {string} context - Relevant context

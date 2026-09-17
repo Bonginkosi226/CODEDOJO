@@ -60,11 +60,11 @@ export const API_PATHS = {
     CHAT: "/api/arcade/chat",
     GET_PROGRESS: "/api/arcade/progress",
     UPDATE_PROGRESS: "/api/arcade/progress",
+    SUBMIT_LESSON: (id) => `/api/arcade/lessons/${id}/submit`,
   },
-  
+
   LEADERBOARD: {
     GET: "/api/leaderboard",
-    AWARD_XP: "/api/leaderboard/xp",
   },
 
   TELEMETRY: {

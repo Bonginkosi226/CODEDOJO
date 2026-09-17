@@ -1,5 +1,9 @@
-import { MistralAI } from "@langchain/mistralai";
 import User from '../models/User.js';
+import { findLessonById } from '../data/arcadeLessons.js';
+import { evaluateSubmission, STATUS } from '../services/missionChecker.js';
+import { calculateLevel } from '../utils/xpUtils.js';
+import * as geminiService from '../utils/geminiService.js';
+import * as mistralService from '../utils/mistralService.js';
 
 const JAVA_CURRICULUM = `
 ## Java Curriculum Reference (use this to teach concepts in proper order and depth)
@@ -160,25 +164,15 @@ You are now assisting a student working through a **Structured Learning Path**. 
 4. **Java Precision:** In Java, remind them that everything must be inside a class and main method.
 5. **Tone:** You are the wise mentor who sparks their hunger for learning. Be impactful but simple.`;
 
-const TIMEOUT_MS = 30000;
-
-function withTimeout(promise, ms, label) {
-  return Promise.race([
-    promise,
-    new Promise(function(_, reject) {
-      setTimeout(function() {
-        reject(new Error(label + " timed out after " + (ms / 1000) + "s"));
-      }, ms);
-    })
-  ]);
-}
-
 export const getProgress = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id).select('arcadeProgress');
+    const user = await User.findById(req.user._id).select('arcadeProgress completedLessons');
     res.status(200).json({
       success: true,
-      data: user.arcadeProgress
+      data: {
+        arcadeProgress: user.arcadeProgress,
+        completedLessons: user.completedLessons,
+      }
     });
   } catch (error) {
     next(error);
@@ -189,15 +183,134 @@ export const updateProgress = async (req, res, next) => {
   try {
     const { progress } = req.body;
     const user = await User.findById(req.user._id);
-    
+
     if (progress > user.arcadeProgress) {
       user.arcadeProgress = progress;
       await user.save();
     }
-    
+
     res.status(200).json({
       success: true,
-      data: user.arcadeProgress
+      data: {
+        arcadeProgress: user.arcadeProgress,
+        completedLessons: user.completedLessons,
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Submit code for an Arcade mission — the server grades it, awards XP,
+//          and unlocks the next lesson. The frontend's pass/fail belief is never trusted.
+// @route   POST /api/arcade/lessons/:id/submit
+// @access  Private
+export const submitLesson = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { code } = req.body;
+
+    if (typeof code !== 'string' || !code.trim()) {
+      return res.status(400).json({ success: false, error: 'Please provide code to submit' });
+    }
+
+    const found = findLessonById(id);
+    if (!found) {
+      return res.status(404).json({ success: false, error: 'Lesson not found' });
+    }
+    const { language, lessons, index, lesson } = found;
+
+    const user = await User.findById(req.user._id);
+
+    const isCompleted = (lessonId) =>
+      user.completedLessons.some((c) => c.lessonId === lessonId && c.language === language);
+
+    if (index > 0 && !isCompleted(lessons[index - 1].id)) {
+      return res.status(403).json({ success: false, error: 'Lesson locked' });
+    }
+
+    const evaluation = await evaluateSubmission({ language, code, checks: lesson.checks });
+
+    if (evaluation.status === STATUS.UNAVAILABLE) {
+      const message = 'Code runner unavailable, please try again.';
+      return res.status(200).json({
+        success: true,
+        data: {
+          passed: false,
+          message,
+          output: message,
+          results: [],
+          xp: 0,
+          level: user.level,
+        },
+      });
+    }
+
+    if (evaluation.status === STATUS.CODE_ERROR) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          passed: false,
+          message: 'Your code has errors. Fix them and try again.',
+          error: evaluation.error,
+          output: evaluation.output,
+          results: [],
+          xp: 0,
+          level: user.level,
+        },
+      });
+    }
+
+    if (!evaluation.passed) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          passed: false,
+          message: 'Not quite — check the hints below and try again.',
+          output: evaluation.output,
+          results: evaluation.results,
+          xp: 0,
+          level: user.level,
+        },
+      });
+    }
+
+    // All checks passed — award XP only the first time this lesson is completed.
+    let xpAwarded = 0;
+    const alreadyCompleted = isCompleted(lesson.id);
+
+    if (!alreadyCompleted) {
+      user.completedLessons.push({
+        lessonId: lesson.id,
+        language,
+        title: lesson.title,
+        code,
+      });
+
+      xpAwarded = lesson.xp || 0;
+      user.xp += xpAwarded;
+      user.level = calculateLevel(user.xp);
+
+      if (index + 1 > user.arcadeProgress) {
+        user.arcadeProgress = index + 1;
+      }
+    } else {
+      const entry = user.completedLessons.find((c) => c.lessonId === lesson.id && c.language === language);
+      if (entry) entry.code = code;
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        passed: true,
+        message: xpAwarded > 0 ? `Mission complete! +${xpAwarded} XP` : 'Mission complete',
+        output: evaluation.output,
+        results: evaluation.results,
+        xp: xpAwarded,
+        level: user.level,
+      },
     });
   } catch (error) {
     next(error);
@@ -212,10 +325,6 @@ export const arcadeChat = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'Please provide a question' });
     }
 
-    if (!process.env.MISTRAL_API_KEY) {
-      return res.status(500).json({ success: false, error: 'AI service is not configured.' });
-    }
-
     const lang = language || 'python';
     const langDisplay = lang.charAt(0).toUpperCase() + lang.slice(1);
     const curriculum = lang === 'java' ? JAVA_CURRICULUM : PYTHON_CURRICULUM;
@@ -223,49 +332,46 @@ export const arcadeChat = async (req, res, next) => {
       .replace('{LANGUAGE}', langDisplay)
       .replace('{CURRICULUM}', curriculum);
 
-    // Build message array from history
-    const messages = [
-      { role: "system", content: systemPrompt },
-    ];
-
-    // Add conversation history (last 30 messages to keep context manageable)
+    // Keep history bounded to keep context manageable
     const recentHistory = history.slice(-30);
-    for (const msg of recentHistory) {
-      messages.push({ role: msg.role, content: msg.content });
+
+    let answer;
+    let lastError;
+
+    // Try Gemini first, then fall back to Mistral. Only if BOTH fail do we
+    // return a real error instead of a fake successful empty reply.
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        answer = await geminiService.senseiChat(systemPrompt, question, recentHistory);
+      } catch (err) {
+        console.error('[Arcade] Sensei Gemini error:', err.message);
+        lastError = err;
+      }
     }
 
-    // Add the current question
-    messages.push({ role: "user", content: question });
+    if (!answer && process.env.MISTRAL_API_KEY) {
+      try {
+        answer = await mistralService.senseiChat(systemPrompt, question, recentHistory);
+      } catch (err) {
+        console.error('[Arcade] Sensei Mistral error:', err.message);
+        lastError = err;
+      }
+    }
 
-    const chat = new MistralAI({
-      model: "codestral-latest",
-      temperature: 0.7,
-      apiKey: process.env.MISTRAL_API_KEY,
-    });
-
-    const response = await withTimeout(
-      chat.invoke(messages),
-      TIMEOUT_MS,
-      'Arcade AI response'
-    );
-
-    res.status(200).json({
-      success: true,
-      data: {
-        answer: response.content || response || "Hmm, I couldn't generate a response. Try again!",
-      },
-    });
-
-  } catch (error) {
-    console.error("[Arcade] Error:", error.message);
-    
-    if (error.message.includes('timed out')) {
-      return res.status(200).json({
-        success: true,
-        data: { answer: "Sensei is thinking too hard! Please try asking again." },
+    if (!answer) {
+      console.error('[Arcade] Sensei unavailable, both providers failed:', lastError?.message);
+      return res.status(503).json({
+        success: false,
+        error: 'Sensei is unavailable right now, please try again',
       });
     }
 
+    res.status(200).json({
+      success: true,
+      data: { answer },
+    });
+
+  } catch (error) {
     next(error);
   }
 };

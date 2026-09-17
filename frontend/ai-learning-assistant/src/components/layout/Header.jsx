@@ -12,11 +12,23 @@ const ICON_MAP = {
   book: { icon: BookOpen, bg: "bg-sky-100 text-sky-600" }
 };
 
+// Mirrors backend/utils/xpUtils.js: Level = Floor(sqrt(XP / 100)) + 1
+const xpForLevel = (level) => 100 * Math.pow(level - 1, 2);
+
 const Header = ({ toggleSidebar }) => {
   const { user } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [showNotifications, setShowNotifications] = useState(false);
   const dropdownRef = useRef(null);
+
+  const xp = user?.xp || 0;
+  const level = user?.level || 1;
+  const currentLevelFloor = xpForLevel(level);
+  const nextLevelFloor = xpForLevel(level + 1);
+  const levelProgress = Math.min(
+    100,
+    Math.max(0, ((xp - currentLevelFloor) / (nextLevelFloor - currentLevelFloor)) * 100)
+  );
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -47,12 +59,13 @@ const Header = ({ toggleSidebar }) => {
           {/* Gamification XP Bar */}
           <div className="hidden sm:flex items-center gap-3 px-4 py-2 bg-slate-100 rounded-[2rem] border-2 border-slate-200 shadow-sm cursor-pointer hover:-translate-y-1 hover:border-slate-300 transition-all">
             <div className="flex flex-col items-end">
-              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Level 1</span>
-              <span className="text-xs font-bold text-amber-500">Novice Ninja</span>
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Level {level}</span>
+              <span className="text-xs font-bold text-amber-500">{xp} XP</span>
             </div>
             <div className="w-24 h-3.5 bg-slate-200 rounded-full overflow-hidden shadow-inner border border-slate-300/50">
-              <div 
-                className="h-full bg-gradient-to-r from-amber-400 to-orange-500 w-[35%] rounded-full shadow-[inset_0_-2px_0_rgba(0,0,0,0.15)]" 
+              <div
+                className="h-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-[inset_0_-2px_0_rgba(0,0,0,0.15)]"
+                style={{ width: `${levelProgress}%` }}
               />
             </div>
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 shadow-[0_3px_0_theme(colors.rose.600)] flex items-center justify-center text-white font-extrabold text-xs">

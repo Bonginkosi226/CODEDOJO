@@ -1,6 +1,7 @@
 import Document from '../models/Document.js';
 import Flashcard from '../models/Flashcard.js';
 import Quiz from '../models/Quiz.js';
+import User from '../models/User.js';
 
 // @desc    Get user learning statistics
 // @route   GET /api/progress/dashboard
@@ -61,6 +62,19 @@ export const getDashboard = async (req, res, next) => {
       .populate('documentId', 'title')
       .select('title score totalQuestions completedAt documentId');
 
+    const { completedLessons = [] } = await User.findById(userId).select('completedLessons');
+    const recentLessons = completedLessons
+      .slice()
+      .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
+      .slice(0, 5)
+      .map((c) => ({
+        id: c._id,
+        lessonId: c.lessonId,
+        language: c.language,
+        title: c.title,
+        completedAt: c.completedAt,
+      }));
+
     // Study streak (mock data)
     const studyStreak = Math.floor(Math.random() * 7) + 1;
 
@@ -80,7 +94,8 @@ export const getDashboard = async (req, res, next) => {
         },
         recentActivity: {
           documents: recentDocuments,
-          quizzes: recentQuizzes
+          quizzes: recentQuizzes,
+          lessons: recentLessons
         }
       }
     });

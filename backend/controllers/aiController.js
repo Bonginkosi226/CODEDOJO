@@ -4,6 +4,7 @@ import Quiz from '../models/Quiz.js';
 import ChatHistory from '../models/ChatHistory.js';
 
 import * as geminiService from '../utils/geminiService.js';
+import * as mistralService from '../utils/mistralService.js';
 import { findRelevantChunks } from '../utils/textChunker.js';
 
 
@@ -48,7 +49,7 @@ export const generateFlashcards = async (req, res, next) => {
     }
 
     // 3️⃣ Generate flashcards (exactly 10)
-    const cards = await geminiService.generateFlashcards(
+    const cards = await mistralService.generateFlashcards(
       document.extractedText,
       count
     );
@@ -115,8 +116,8 @@ export const generateQuiz = async (req, res, next) => {
       });
     }
 
-    // Generate quiz using Gemini
-    const questions = await geminiService.generateQuiz(
+    // Generate quiz using Mistral
+    const questions = await mistralService.generateQuiz(
       document.extractedText,
       parseInt(numQuestions)
     );

@@ -125,7 +125,8 @@ const DashboardPage = () => {
 
       {dashboardData?.recentActivity &&
       (dashboardData.recentActivity.documents?.length > 0 ||
-        dashboardData.recentActivity.quizzes?.length > 0) ? (
+        dashboardData.recentActivity.quizzes?.length > 0 ||
+        dashboardData.recentActivity.lessons?.length > 0) ? (
         <div className="space-y-3">
           {[
             ...(dashboardData.recentActivity.documents || []).map((doc) => ({
@@ -142,6 +143,13 @@ const DashboardPage = () => {
               link: `/quizzes/${quiz._id}`,
               type: "quiz",
             })),
+            ...(dashboardData.recentActivity.lessons || []).map((lesson) => ({
+              id: lesson.id,
+              description: `${lesson.title} (${lesson.language === "python" ? "Python" : "Java"})`,
+              timestamp: lesson.completedAt,
+              link: `/arcade`,
+              type: "lesson",
+            })),
           ]
             .sort(
               (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
@@ -157,12 +165,16 @@ const DashboardPage = () => {
                       className={`w-3 h-3 rounded-full shadow-[0_2px_0_rgba(0,0,0,0.1)] ${
                         activity.type === "document"
                           ? "bg-sky-400"
+                          : activity.type === "lesson"
+                          ? "bg-amber-400"
                           : "bg-emerald-400"
                       }`}
                     />
                     <p className="text-[15px] font-bold text-slate-800 truncate">
                       {activity.type === "document"
                         ? "Studied Scroll: "
+                        : activity.type === "lesson"
+                        ? "Completed Mission: "
                         : "Attempted Challenge: "}
                       <span className="text-slate-500 font-semibold">
                         {activity.description}

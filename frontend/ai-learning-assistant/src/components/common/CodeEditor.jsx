@@ -1,15 +1,16 @@
 import React, { useState } from "react";
 import Editor from "@monaco-editor/react";
-import { Play, RotateCcw, CheckCircle2, MessageSquare, Terminal } from "lucide-react";
+import { Play, RotateCcw, MessageSquare, Terminal } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "axios";
 import { useTelemetry } from "../../context/TelemetryContext.jsx";
 
-const CodeEditor = ({ code, setCode, language = "python", setLanguage, onRun, onCompileResult }) => {
+const CodeEditor = ({ code, setCode, language = "python", setLanguage, onRun, onCompileResult, onSubmitMission, isSubmittingMission = false, output: controlledOutput }) => {
   const { track } = useTelemetry();
   const [isRunning, setIsRunning] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
-  const [output, setOutput] = useState("");
+  const [internalOutput, setInternalOutput] = useState("");
+  const output = controlledOutput !== undefined ? controlledOutput : internalOutput;
 
   const handleEditorChange = (value) => {
     if (value !== undefined) {
@@ -31,11 +32,13 @@ const CodeEditor = ({ code, setCode, language = "python", setLanguage, onRun, on
     }, 1000);
   };
 
+  // Free-run path: used when no onSubmitMission is provided (e.g. the document
+  // chat editor), hits /api/execute directly and manages its own output state.
   const handleCompile = async () => {
     if (!code || code.trim() === "") return;
-    
+
     setIsCompiling(true);
-    setOutput("Compiling...");
+    setInternalOutput("Compiling...");
     try {
       const response = await axios.post("http://localhost:8000/api/execute", {
         language: language,
@@ -43,7 +46,7 @@ const CodeEditor = ({ code, setCode, language = "python", setLanguage, onRun, on
         files: [{ content: code }]
       });
       const result = response.data.run.output || "Program finished with no output.";
-      setOutput(result);
+      setInternalOutput(result);
       track('milestone', 'CodeEditor: Compile Success', { language, outputLength: result.length });
       // Notify parent about the compilation result
       if (onCompileResult) {
@@ -51,7 +54,7 @@ const CodeEditor = ({ code, setCode, language = "python", setLanguage, onRun, on
       }
     } catch (error) {
       const errorMsg = "Compilation error: " + (error.response?.data?.message || error.message);
-      setOutput(errorMsg);
+      setInternalOutput(errorMsg);
       track('error', 'CodeEditor: Compile Failure', { language, error: errorMsg });
       if (onCompileResult) {
         onCompileResult(code, errorMsg);
@@ -64,6 +67,22 @@ const CodeEditor = ({ code, setCode, language = "python", setLanguage, onRun, on
   const handleReset = () => {
     setCode("// Write your " + language + " code here...");
   };
+
+  // Graded path: used on the Arcade lesson screen. Running the code and
+  // checking the mission are the same server call — no separate /api/execute hit.
+  const handleRunClick = () => {
+    if (!code || code.trim() === "") return;
+
+    if (onSubmitMission) {
+      if (isSubmittingMission) return;
+      track('click', 'CodeEditor', { action: 'Run Code (Mission)', language });
+      onSubmitMission(code);
+    } else {
+      handleCompile();
+    }
+  };
+
+  const isRunClickBusy = onSubmitMission ? isSubmittingMission : isCompiling;
 
   return (
     <div className="flex flex-col h-full bg-[#1e1e1e] rounded-xl overflow-hidden border border-slate-700 shadow-2xl">
@@ -103,14 +122,14 @@ const CodeEditor = ({ code, setCode, language = "python", setLanguage, onRun, on
             <RotateCcw size={16} />
           </button>
           <button
-            onClick={handleCompile}
-            disabled={isCompiling}
+            onClick={handleRunClick}
+            disabled={isRunClickBusy}
             className="flex items-center gap-2 px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isCompiling ? (
+            {isRunClickBusy ? (
               <span className="flex items-center gap-1.5">
                 <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Compiling...
+                {onSubmitMission ? "Checking..." : "Compiling..."}
               </span>
             ) : (
               <span className="flex items-center gap-1.5">

@@ -50,7 +50,24 @@ password: {
     arcadeProgress: {
         type: Number,
         default: 0
-    }
+    },
+    completedLessons: [{
+        lessonId: {
+            type: String,
+            required: true
+        },
+        language: {
+            type: String,
+            enum: ['python', 'java'],
+            required: true
+        },
+        title: String,
+        code: String,
+        completedAt: {
+            type: Date,
+            default: Date.now
+        }
+    }]
 }, {
     timestamps: true
 });
