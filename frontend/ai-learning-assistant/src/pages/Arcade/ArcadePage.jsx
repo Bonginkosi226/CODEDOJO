@@ -3,7 +3,8 @@ import {
   Send, Sparkles, MessageSquare, Code2, ArrowLeft,
   Gamepad2, Lock, Swords, Target, Puzzle, Trophy,
   Star, Volume2, VolumeX, ChevronRight, ChevronLeft,
-  CheckCircle2, Play, Info, HelpCircle, XCircle, AlertTriangle
+  CheckCircle2, Play, Info, HelpCircle, XCircle, AlertTriangle,
+  Dumbbell, Zap
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useTelemetry } from "../../context/TelemetryContext.jsx";
@@ -26,9 +27,9 @@ const ProgressBar = ({ current, total }) => {
 };
 
 // ─── Arcade Roadmap Component ───
-// Lock/complete state is derived from the server's completedLessons list for this
-// language, not the (shared, per-user rather than per-track) arcadeProgress number.
-const ArcadeRoadmap = ({ language, completedLessonIds, onStart }) => {
+// Lock/complete state comes from the server's per-lesson status. A lesson only
+// counts as complete when its mission AND all its practice problems are passed.
+const ArcadeRoadmap = ({ language, lessonStatus, onStart }) => {
   const curriculum = language === "python" ? PYTHON_CURRICULUM : JAVA_CURRICULUM;
 
   return (
@@ -44,9 +45,11 @@ const ArcadeRoadmap = ({ language, completedLessonIds, onStart }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full px-4">
         {curriculum.map((lesson, index) => {
-          const isCompleted = completedLessonIds.has(lesson.id);
-          const isLocked = index > 0 && !completedLessonIds.has(curriculum[index - 1].id);
+          const status = lessonStatus[lesson.id] || {};
+          const isCompleted = !!status.fullyComplete;
+          const isLocked = index > 0 && !lessonStatus[curriculum[index - 1].id]?.fullyComplete;
           const isActive = !isCompleted && !isLocked;
+          const practicePending = isActive && status.missionComplete && status.practiceTotal > 0;
 
           return (
             <div
@@ -75,7 +78,24 @@ const ArcadeRoadmap = ({ language, completedLessonIds, onStart }) => {
               <h3 className={`text-lg font-black mb-1 ${isActive ? 'text-slate-800' : 'text-slate-500'}`}>
                 {lesson.title}
               </h3>
-              <p className="text-xs font-bold text-slate-400 mb-6">{lesson.concept}</p>
+              <p className="text-xs font-bold text-slate-400 mb-3">{lesson.concept}</p>
+
+              {!isLocked && status.practiceTotal > 0 && (
+                <div className="mb-4">
+                  <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                    <span className="flex items-center gap-1">
+                      <Dumbbell size={12} /> Practice
+                    </span>
+                    <span>{status.missionComplete ? `${status.practiceDone}/${status.practiceTotal}` : "Pass the mission first"}</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                    <div
+                      className="h-full bg-gradient-to-r from-amber-300 to-emerald-400 transition-all duration-500"
+                      style={{ width: `${status.missionComplete ? (status.practiceDone / status.practiceTotal) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+              )}
 
               {isLocked ? (
                 <div className="flex items-center justify-center gap-2 text-slate-400 font-bold text-sm py-3">
@@ -94,7 +114,7 @@ const ArcadeRoadmap = ({ language, completedLessonIds, onStart }) => {
                   className="w-full py-3 bg-amber-400 hover:bg-amber-500 text-white font-black uppercase rounded-2xl shadow-[0_4px_0_theme(colors.amber.600)] active:shadow-none active:translate-y-[4px] transition-all flex items-center justify-center gap-2"
                 >
                   <Play size={18} fill="currentColor" />
-                  Enter Dojo
+                  {practicePending ? "Continue Practice" : "Enter Dojo"}
                 </button>
               )}
             </div>
@@ -155,11 +175,11 @@ const DojoPathGame = ({ language, onBack }) => {
   const curriculum = language === "python" ? PYTHON_CURRICULUM : JAVA_CURRICULUM;
 
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [completedLessons, setCompletedLessons] = useState([]); // raw list from server: {lessonId, language, ...}
+  const [lessonStatus, setLessonStatus] = useState({}); // server truth per lesson: {missionComplete, practiceDone, practiceTotal, fullyComplete}
   const [code, setCode] = useState("");
   const [output, setOutput] = useState("");
   const [missionResult, setMissionResult] = useState(null);
-  const [lessonPassed, setLessonPassed] = useState(false);
+  const [missionPassed, setMissionPassed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(false);
   const [showRoadmap, setShowRoadmap] = useState(true);
@@ -167,10 +187,49 @@ const DojoPathGame = ({ language, onBack }) => {
   const [senseiHelp, setSenseiHelp] = useState("");
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
+  // Practice: only loaded after the mission is passed.
+  const [practiceList, setPracticeList] = useState([]);
+  const [walkthroughAfter, setWalkthroughAfter] = useState(3);
+  const [activePracticeId, setActivePracticeId] = useState(null);
+  const missionDraftRef = useRef(null); // the mission's code/output/result while a practice problem is open
+  const practiceDraftsRef = useRef({}); // per-problem drafts so switching never loses work
+
   const lesson = curriculum[currentIdx];
-  const completedIdsForLanguage = new Set(
-    completedLessons.filter((c) => c.language === language).map((c) => c.lessonId)
-  );
+  const status = lessonStatus[lesson.id] || {};
+  const activePractice = practiceList.find((p) => p.id === activePracticeId) || null;
+  const practiceTotal = practiceList.length || status.practiceTotal || 0;
+  const practiceDone = practiceList.length
+    ? practiceList.filter((p) => p.completed).length
+    : status.practiceDone || 0;
+  // Lessons finished before required practice existed are already fully complete
+  // on the server, so their practice is optional.
+  const canAdvance = missionPassed && (!!status.fullyComplete || (practiceTotal > 0 && practiceDone >= practiceTotal));
+  const practiceIsOptional = missionPassed && !!status.fullyComplete && practiceDone < practiceTotal;
+
+  const refreshProgress = async () => {
+    try {
+      const response = await arcadeService.getProgress();
+      if (response.success) {
+        setLessonStatus(response.data.lessonStatus || {});
+        return response.data;
+      }
+    } catch (err) {
+      console.error("Failed to fetch progress:", err);
+    }
+    return null;
+  };
+
+  const loadPractice = async (lessonId) => {
+    try {
+      const response = await arcadeService.getPractice(lessonId);
+      if (response.success) {
+        setPracticeList(response.data.practice || []);
+        setWalkthroughAfter(response.data.walkthroughAfter || 3);
+      }
+    } catch (err) {
+      console.error("Failed to load practice problems:", err);
+    }
+  };
 
   // Fetch initial progress
   useEffect(() => {
@@ -179,7 +238,7 @@ const DojoPathGame = ({ language, onBack }) => {
         const response = await arcadeService.getProgress();
         if (response.success) {
           setCurrentIdx(response.data.arcadeProgress || 0);
-          setCompletedLessons(response.data.completedLessons || []);
+          setLessonStatus(response.data.lessonStatus || {});
         }
       } catch (err) {
         console.error("Failed to fetch progress:", err);
@@ -190,12 +249,22 @@ const DojoPathGame = ({ language, onBack }) => {
 
   useEffect(() => {
     if (!showRoadmap) {
+      const alreadyPassed = !!lessonStatus[lesson.id]?.missionComplete;
+
       setCode(lesson.initialCode);
       setOutput("");
       setMissionResult(null);
-      setLessonPassed(completedIdsForLanguage.has(lesson.id));
+      setMissionPassed(alreadyPassed);
       setSenseiHelp("");
       setIsHelpOpen(false);
+      setActivePracticeId(null);
+      setPracticeList([]);
+      missionDraftRef.current = null;
+      practiceDraftsRef.current = {};
+
+      if (alreadyPassed) {
+        loadPractice(lesson.id);
+      }
 
       track("lesson_start", lesson.id, { language });
 
@@ -234,21 +303,22 @@ const DojoPathGame = ({ language, onBack }) => {
       setOutput(data.output || "");
 
       if (data.passed) {
-        setLessonPassed(true);
+        const firstTime = !missionPassed;
+        setMissionPassed(true);
         track("lesson_complete", lesson.id, { language, xp: data.xp });
-
-        if (!completedIdsForLanguage.has(lesson.id)) {
-          setCompletedLessons((prev) => [
-            ...prev,
-            { lessonId: lesson.id, language },
-          ]);
-        }
 
         if (data.xp > 0 && user) {
           updateUser({
             xp: (user.xp || 0) + data.xp,
             level: data.level,
           });
+        }
+
+        // Mission passed: the server now allows practice. Refresh the truth
+        // (lesson status) and load the practice problems.
+        await refreshProgress();
+        if (firstTime || practiceList.length === 0) {
+          await loadPractice(lesson.id);
         }
       }
     } catch (err) {
@@ -264,12 +334,101 @@ const DojoPathGame = ({ language, onBack }) => {
     }
   };
 
-  const askSensei = async () => {
+  // Same flow as a mission: one server call runs and grades the code. The
+  // client never sends XP or pass/fail.
+  const handleSubmitPractice = async (submittedCode) => {
+    if (isSubmitting || !activePractice) return;
+    setIsSubmitting(true);
+    setMissionResult(null);
+    try {
+      const response = await arcadeService.submitPractice(lesson.id, activePractice.id, submittedCode);
+      const data = response.data;
+      setMissionResult(data);
+      setOutput(data.output || "");
+
+      setPracticeList((prev) =>
+        prev.map((p) =>
+          p.id === activePractice.id
+            ? { ...p, attempts: data.attempts, completed: p.completed || data.passed }
+            : p
+        )
+      );
+
+      if (data.passed) {
+        track("practice_complete", activePractice.id, { language, xp: data.xp });
+        if (data.xp > 0 && user) {
+          updateUser({
+            xp: (user.xp || 0) + data.xp,
+            level: data.level,
+          });
+        }
+        await refreshProgress();
+      }
+    } catch (err) {
+      const errorMsg = err?.error || err?.message || "Something went wrong submitting your practice. Please try again.";
+      setMissionResult({ passed: false, message: errorMsg, results: [] });
+      setOutput(errorMsg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Single Run Code entry point for the shared CodeEditor.
+  const handleRunOrSubmit = (submittedCode) =>
+    activePractice ? handleSubmitPractice(submittedCode) : handleSubmitMission(submittedCode);
+
+  const savePracticeDraft = () => {
+    if (activePractice) {
+      practiceDraftsRef.current[activePractice.id] = { code, output, result: missionResult };
+    }
+  };
+
+  const openPractice = (problem) => {
+    if (problem.id === activePracticeId) return;
+    if (activePractice) {
+      savePracticeDraft();
+    } else {
+      missionDraftRef.current = { code, output, result: missionResult };
+    }
+    const draft = practiceDraftsRef.current[problem.id];
+    setActivePracticeId(problem.id);
+    setCode(draft ? draft.code : problem.starterCode);
+    setOutput(draft ? draft.output : "");
+    setMissionResult(draft ? draft.result : null);
+    setSenseiHelp("");
+    setIsHelpOpen(false);
+  };
+
+  const backToLesson = () => {
+    savePracticeDraft();
+    const draft = missionDraftRef.current;
+    setActivePracticeId(null);
+    setCode(draft ? draft.code : lesson.initialCode);
+    setOutput(draft ? draft.output : "");
+    setMissionResult(draft ? draft.result : null);
+    setSenseiHelp("");
+    setIsHelpOpen(false);
+  };
+
+  const askSensei = async ({ walkthrough = false } = {}) => {
     setIsAskingSensei(true);
     setIsHelpOpen(true);
     try {
-      const prompt = `I am stuck on the lesson: "${lesson.title}". My current code is:\n\`\`\`\n${code}\n\`\`\`\nAnd the output is:\n\`\`\`\n${output}\n\`\`\`\nPlease explain why I might be stuck and provide a helpful mentor-like hint without giving the full answer immediately.`;
-      const response = await arcadeService.arcadeChat(language, prompt, []);
+      let response;
+      if (activePractice) {
+        const ask = walkthrough
+          ? "I've tried this several times and I'm still stuck. Please walk me through it step by step."
+          : "Please explain why I might be stuck and give a helpful mentor-like hint without giving the full answer immediately.";
+        const prompt = `My current code is:\n\`\`\`\n${code}\n\`\`\`\nAnd the output is:\n\`\`\`\n${output}\n\`\`\`\n${ask}`;
+        response = await arcadeService.arcadeChat(language, prompt, [], {
+          lessonId: lesson.id,
+          practiceId: activePractice.id,
+          walkthrough,
+        });
+      } else {
+        const prompt = `I am stuck on the lesson: "${lesson.title}". My current code is:\n\`\`\`\n${code}\n\`\`\`\nAnd the output is:\n\`\`\`\n${output}\n\`\`\`\nPlease explain why I might be stuck and provide a helpful mentor-like hint without giving the full answer immediately.`;
+        response = await arcadeService.arcadeChat(language, prompt, []);
+      }
       setSenseiHelp(response.data.answer);
     } catch (err) {
       setSenseiHelp(err?.error || "Sensei is unavailable right now, please try again");
@@ -282,7 +441,7 @@ const DojoPathGame = ({ language, onBack }) => {
     return (
       <ArcadeRoadmap
         language={language}
-        completedLessonIds={completedIdsForLanguage}
+        lessonStatus={lessonStatus}
         onStart={(idx) => {
           setCurrentIdx(idx);
           setShowRoadmap(false);
@@ -346,23 +505,108 @@ const DojoPathGame = ({ language, onBack }) => {
                 <code className="text-sky-300 font-mono text-sm whitespace-pre-wrap">{lesson.example}</code>
               </div>
 
-              <div className="mt-8 p-6 bg-amber-50 rounded-3xl border-2 border-amber-100 border-dashed">
-                <h4 className="flex items-center gap-2 text-amber-700 font-black uppercase text-xs tracking-widest mb-3">
-                  <Target size={16} /> Mission Objective
-                </h4>
-                <p className="text-amber-900 text-sm font-bold leading-relaxed">{lesson.goal}</p>
-              </div>
+              {activePractice ? (
+                <div className="mt-8 p-6 bg-sky-50 rounded-3xl border-2 border-sky-100 border-dashed">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <h4 className="flex items-center gap-2 text-sky-700 font-black uppercase text-xs tracking-widest">
+                      <Dumbbell size={16} /> Practice: {activePractice.title}
+                    </h4>
+                    <button
+                      onClick={backToLesson}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-sky-100 text-sky-600 font-black uppercase text-[10px] rounded-xl border-2 border-sky-200 transition-all shrink-0"
+                    >
+                      <ArrowLeft size={12} /> Back to lesson
+                    </button>
+                  </div>
+                  <p className="text-sky-900 text-sm font-bold leading-relaxed">{activePractice.prompt}</p>
+                </div>
+              ) : (
+                <div className="mt-8 p-6 bg-amber-50 rounded-3xl border-2 border-amber-100 border-dashed">
+                  <h4 className="flex items-center gap-2 text-amber-700 font-black uppercase text-xs tracking-widest mb-3">
+                    <Target size={16} /> Mission Objective
+                  </h4>
+                  <p className="text-amber-900 text-sm font-bold leading-relaxed">{lesson.goal}</p>
+                </div>
+              )}
+
+              {/* Practice: unlocked only after the mission passes */}
+              {missionPassed && practiceList.length > 0 && (
+                <div className="mt-8 not-prose">
+                  <h4 className="flex items-center justify-between gap-2 text-slate-700 font-black uppercase text-xs tracking-widest mb-1">
+                    <span className="flex items-center gap-2">
+                      <Dumbbell size={16} className="text-amber-500" /> Practice
+                    </span>
+                    <span className="text-slate-400">{practiceDone}/{practiceTotal}</span>
+                  </h4>
+                  <p className="text-xs font-bold text-slate-500 mb-4">
+                    {practiceIsOptional
+                      ? "You finished this lesson before practice was required — these are optional extra reps."
+                      : "Complete all practice problems to unlock the next lesson"}
+                  </p>
+
+                  <div className="space-y-3">
+                    {practiceList.map((problem) => (
+                      <button
+                        key={problem.id}
+                        onClick={() => openPractice(problem)}
+                        className={`w-full text-left flex items-center gap-3 p-4 rounded-2xl border-2 transition-all ${
+                          problem.id === activePracticeId
+                            ? "bg-sky-50 border-sky-300"
+                            : problem.completed
+                            ? "bg-emerald-50 border-emerald-200 hover:border-emerald-300"
+                            : "bg-white border-slate-200 hover:border-amber-300"
+                        }`}
+                      >
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                          problem.completed ? "bg-emerald-400 text-white" : "bg-slate-100 text-slate-300"
+                        }`}>
+                          <CheckCircle2 size={18} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-black text-sm text-slate-800 truncate">{problem.title}</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            {problem.difficulty}
+                            {!problem.completed && problem.attempts > 0 ? ` · ${problem.attempts} failed attempt${problem.attempts === 1 ? "" : "s"}` : ""}
+                          </p>
+                        </div>
+                        <span className="flex items-center gap-1 text-xs font-black text-amber-600 shrink-0">
+                          <Zap size={12} fill="currentColor" /> {problem.xp} XP
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="p-4 bg-slate-50 border-t-4 border-slate-100 flex items-center justify-center gap-2">
-            <button
-              onClick={askSensei}
-              className="flex items-center gap-2 px-6 py-3 bg-white hover:bg-slate-100 text-slate-600 font-black uppercase text-xs rounded-2xl border-2 border-slate-200 transition-all active:translate-y-1"
-            >
-              <HelpCircle size={16} className="text-rose-400" />
-              Ask Sensei
-            </button>
+          <div className="p-4 bg-slate-50 border-t-4 border-slate-100 flex flex-col items-center justify-center gap-2">
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={() => askSensei()}
+                className="flex items-center gap-2 px-6 py-3 bg-white hover:bg-slate-100 text-slate-600 font-black uppercase text-xs rounded-2xl border-2 border-slate-200 transition-all active:translate-y-1"
+              >
+                <HelpCircle size={16} className="text-rose-400" />
+                Ask Sensei
+              </button>
+
+              {activePractice && activePractice.attempts >= walkthroughAfter && !activePractice.completed && (
+                <button
+                  onClick={() => askSensei({ walkthrough: true })}
+                  disabled={isAskingSensei}
+                  className="flex items-center gap-2 px-6 py-3 bg-rose-400 hover:bg-rose-500 text-white font-black uppercase text-xs rounded-2xl shadow-[0_4px_0_theme(colors.rose.600)] active:shadow-none active:translate-y-[4px] transition-all disabled:opacity-50"
+                >
+                  <Sparkles size={16} />
+                  Full walkthrough
+                </button>
+              )}
+            </div>
+
+            {activePractice && !activePractice.completed && activePractice.attempts < walkthroughAfter && (
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                Sensei's full walkthrough unlocks after {walkthroughAfter} failed attempts ({activePractice.attempts}/{walkthroughAfter})
+              </p>
+            )}
           </div>
         </div>
 
@@ -374,7 +618,7 @@ const DojoPathGame = ({ language, onBack }) => {
               setCode={setCode}
               language={language}
               onRun={handleRunCode}
-              onSubmitMission={handleSubmitMission}
+              onSubmitMission={handleRunOrSubmit}
               isSubmittingMission={isSubmitting}
               output={output}
             />
@@ -413,7 +657,7 @@ const DojoPathGame = ({ language, onBack }) => {
               <ChevronLeft size={18} /> Prev
             </button>
 
-            {lessonPassed ? (
+            {canAdvance ? (
               <button
                 onClick={async () => {
                   if (currentIdx < curriculum.length - 1) {
@@ -434,7 +678,10 @@ const DojoPathGame = ({ language, onBack }) => {
               </button>
             ) : (
               <div className="flex-1 py-5 bg-slate-100 text-slate-400 font-black uppercase text-xs rounded-3xl border-2 border-slate-200 border-dashed flex items-center justify-center gap-2">
-                <Lock size={16} /> Complete the mission to continue
+                <Lock size={16} />
+                {missionPassed
+                  ? `Practice: ${practiceDone}/${practiceTotal} — finish all to continue`
+                  : "Complete the mission to continue"}
               </div>
             )}
           </div>

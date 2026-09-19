@@ -126,7 +126,8 @@ const DashboardPage = () => {
       {dashboardData?.recentActivity &&
       (dashboardData.recentActivity.documents?.length > 0 ||
         dashboardData.recentActivity.quizzes?.length > 0 ||
-        dashboardData.recentActivity.lessons?.length > 0) ? (
+        dashboardData.recentActivity.lessons?.length > 0 ||
+        dashboardData.recentActivity.practice?.length > 0) ? (
         <div className="space-y-3">
           {[
             ...(dashboardData.recentActivity.documents || []).map((doc) => ({
@@ -150,6 +151,13 @@ const DashboardPage = () => {
               link: `/arcade`,
               type: "lesson",
             })),
+            ...(dashboardData.recentActivity.practice || []).map((problem) => ({
+              id: problem.id,
+              description: `${problem.title}${problem.lessonTitle ? ` — ${problem.lessonTitle}` : ""}${problem.language ? ` (${problem.language === "python" ? "Python" : "Java"})` : ""}`,
+              timestamp: problem.completedAt,
+              link: `/arcade`,
+              type: "practice",
+            })),
           ]
             .sort(
               (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
@@ -167,6 +175,8 @@ const DashboardPage = () => {
                           ? "bg-sky-400"
                           : activity.type === "lesson"
                           ? "bg-amber-400"
+                          : activity.type === "practice"
+                          ? "bg-violet-400"
                           : "bg-emerald-400"
                       }`}
                     />
@@ -175,6 +185,8 @@ const DashboardPage = () => {
                         ? "Studied Scroll: "
                         : activity.type === "lesson"
                         ? "Completed Mission: "
+                        : activity.type === "practice"
+                        ? "Finished Practice: "
                         : "Attempted Challenge: "}
                       <span className="text-slate-500 font-semibold">
                         {activity.description}

@@ -61,6 +61,8 @@ export const API_PATHS = {
     GET_PROGRESS: "/api/arcade/progress",
     UPDATE_PROGRESS: "/api/arcade/progress",
     SUBMIT_LESSON: (id) => `/api/arcade/lessons/${id}/submit`,
+    GET_PRACTICE: (lessonId) => `/api/arcade/lessons/${lessonId}/practice`,
+    SUBMIT_PRACTICE: (lessonId, practiceId) => `/api/arcade/lessons/${lessonId}/practice/${practiceId}/submit`,
   },
 
   LEADERBOARD: {

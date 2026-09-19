@@ -63,9 +63,40 @@ password: {
         },
         title: String,
         code: String,
+        // true for missions completed after required practice was introduced.
+        // Entries created before that have no value here, so they are treated
+        // as fully complete and existing students are never locked out.
+        practiceRequired: {
+            type: Boolean,
+            default: false
+        },
         completedAt: {
             type: Date,
             default: Date.now
+        }
+    }],
+    // One entry per practice problem the student has attempted. `attempts`
+    // counts FAILED attempts only; `completedAt` is null until first pass.
+    completedPractice: [{
+        lessonId: {
+            type: String,
+            required: true
+        },
+        practiceId: {
+            type: String,
+            required: true
+        },
+        code: {
+            type: String,
+            default: ''
+        },
+        attempts: {
+            type: Number,
+            default: 0
+        },
+        completedAt: {
+            type: Date,
+            default: null
         }
     }]
 }, {

@@ -1,8 +1,19 @@
 import User from '../models/User.js';
-import { findLessonById } from '../data/arcadeLessons.js';
+import { findLessonById, findPractice } from '../data/arcadeLessons.js';
 import { evaluateSubmission, STATUS } from '../services/missionChecker.js';
 import { calculateLevel } from '../utils/xpUtils.js';
 import { chat as aiChat, AIServiceError } from '../services/aiService.js';
+import {
+  isMissionComplete,
+  isFullyComplete,
+  getPracticeEntry,
+  countPracticeDone,
+  buildLessonStatus,
+} from '../services/lessonProgress.js';
+
+// After this many failed attempts on the SAME practice problem, Sensei may
+// give a full step-by-step walkthrough instead of only hints.
+const WALKTHROUGH_AFTER_FAILED_ATTEMPTS = 3;
 
 const JAVA_CURRICULUM = `
 ## Java Curriculum Reference (use this to teach concepts in proper order and depth)
@@ -165,12 +176,13 @@ You are now assisting a student working through a **Structured Learning Path**. 
 
 export const getProgress = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id).select('arcadeProgress completedLessons');
+    const user = await User.findById(req.user._id).select('arcadeProgress completedLessons completedPractice');
     res.status(200).json({
       success: true,
       data: {
         arcadeProgress: user.arcadeProgress,
         completedLessons: user.completedLessons,
+        lessonStatus: buildLessonStatus(user),
       }
     });
   } catch (error) {
@@ -193,6 +205,7 @@ export const updateProgress = async (req, res, next) => {
       data: {
         arcadeProgress: user.arcadeProgress,
         completedLessons: user.completedLessons,
+        lessonStatus: buildLessonStatus(user),
       }
     });
   } catch (error) {
@@ -221,10 +234,9 @@ export const submitLesson = async (req, res, next) => {
 
     const user = await User.findById(req.user._id);
 
-    const isCompleted = (lessonId) =>
-      user.completedLessons.some((c) => c.lessonId === lessonId && c.language === language);
-
-    if (index > 0 && !isCompleted(lessons[index - 1].id)) {
+    // The previous lesson must be FULLY complete: its mission and all of its
+    // required practice problems (lessons finished before practice existed count).
+    if (index > 0 && !isFullyComplete(user, lessons[index - 1])) {
       return res.status(403).json({ success: false, error: 'Lesson locked' });
     }
 
@@ -276,7 +288,7 @@ export const submitLesson = async (req, res, next) => {
 
     // All checks passed — award XP only the first time this lesson is completed.
     let xpAwarded = 0;
-    const alreadyCompleted = isCompleted(lesson.id);
+    const alreadyCompleted = isMissionComplete(user, lesson);
 
     if (!alreadyCompleted) {
       user.completedLessons.push({
@@ -284,6 +296,7 @@ export const submitLesson = async (req, res, next) => {
         language,
         title: lesson.title,
         code,
+        practiceRequired: (lesson.practice || []).length > 0,
       });
 
       xpAwarded = lesson.xp || 0;
@@ -316,9 +329,169 @@ export const submitLesson = async (req, res, next) => {
   }
 };
 
+// Shared by the practice endpoints: resolve lesson + practice and enforce that
+// the lesson's mission has been passed (practice is not accessible before that).
+const loadPracticeContext = async (req, res) => {
+  const found = findLessonById(req.params.lessonId);
+  if (!found) {
+    res.status(404).json({ success: false, error: 'Lesson not found' });
+    return null;
+  }
+
+  let practice = null;
+  if (req.params.practiceId) {
+    practice = findPractice(found.lesson, req.params.practiceId);
+    if (!practice) {
+      res.status(404).json({ success: false, error: 'Practice problem not found' });
+      return null;
+    }
+  }
+
+  const user = await User.findById(req.user._id);
+  if (!isMissionComplete(user, found.lesson)) {
+    res.status(403).json({ success: false, error: 'Complete the lesson mission first' });
+    return null;
+  }
+
+  return { ...found, practice, user };
+};
+
+// @desc    List a lesson's practice problems (prompts and starter code, never the checks)
+// @route   GET /api/arcade/lessons/:lessonId/practice
+// @access  Private (mission must be completed)
+export const listPractice = async (req, res, next) => {
+  try {
+    const ctx = await loadPracticeContext(req, res);
+    if (!ctx) return;
+    const { lesson, user } = ctx;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        lessonId: lesson.id,
+        practice: (lesson.practice || []).map((p) => {
+          const entry = getPracticeEntry(user, p.id);
+          return {
+            id: p.id,
+            title: p.title,
+            prompt: p.prompt,
+            starterCode: p.starterCode,
+            difficulty: p.difficulty,
+            xp: p.xp,
+            completed: !!(entry && entry.completedAt),
+            attempts: entry ? entry.attempts : 0,
+          };
+        }),
+        walkthroughAfter: WALKTHROUGH_AFTER_FAILED_ATTEMPTS,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Submit code for a practice problem — graded server-side with the same
+//          engine as missions. The client never sends XP or pass/fail.
+// @route   POST /api/arcade/lessons/:lessonId/practice/:practiceId/submit
+// @access  Private (mission must be completed)
+export const submitPractice = async (req, res, next) => {
+  try {
+    const { code } = req.body;
+
+    if (typeof code !== 'string' || !code.trim()) {
+      return res.status(400).json({ success: false, error: 'Please provide code to submit' });
+    }
+
+    const ctx = await loadPracticeContext(req, res);
+    if (!ctx) return;
+    const { language, lesson, practice, user } = ctx;
+
+    const evaluation = await evaluateSubmission({ language, code, checks: practice.checks });
+
+    let entry = getPracticeEntry(user, practice.id);
+    if (!entry) {
+      user.completedPractice.push({ lessonId: lesson.id, practiceId: practice.id, code: '', attempts: 0 });
+      entry = user.completedPractice[user.completedPractice.length - 1];
+    }
+
+    const respond = (data) =>
+      res.status(200).json({
+        success: true,
+        data: {
+          xp: 0,
+          level: user.level,
+          attempts: entry.attempts,
+          newBadges: [],
+          practiceProgress: {
+            done: countPracticeDone(user, lesson),
+            total: (lesson.practice || []).length,
+          },
+          lessonFullyComplete: isFullyComplete(user, lesson),
+          ...data,
+        },
+      });
+
+    if (evaluation.status === STATUS.UNAVAILABLE) {
+      // Not the student's fault — never counts as an attempt.
+      const message = 'Code runner unavailable, please try again.';
+      return respond({ passed: false, message, output: message, results: [] });
+    }
+
+    if (evaluation.status === STATUS.CODE_ERROR || !evaluation.passed) {
+      if (!entry.completedAt) {
+        entry.attempts += 1;
+      }
+      entry.code = code;
+      await user.save();
+
+      if (evaluation.status === STATUS.CODE_ERROR) {
+        return respond({
+          passed: false,
+          message: 'Your code has errors. Fix them and try again.',
+          error: evaluation.error,
+          output: evaluation.output,
+          results: [],
+        });
+      }
+      return respond({
+        passed: false,
+        message: 'Not quite — check the hints below and try again.',
+        output: evaluation.output,
+        results: evaluation.results,
+      });
+    }
+
+    // Passed — award practice XP only the first time.
+    let xpAwarded = 0;
+    if (!entry.completedAt) {
+      entry.completedAt = new Date();
+      xpAwarded = practice.xp || 0;
+      user.xp += xpAwarded;
+      user.level = calculateLevel(user.xp);
+    }
+    entry.code = code;
+    await user.save();
+
+    return respond({
+      passed: true,
+      message: xpAwarded > 0 ? `Practice complete! +${xpAwarded} XP` : 'Practice complete',
+      output: evaluation.output,
+      results: evaluation.results,
+      xp: xpAwarded,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const WALKTHROUGH_PROMPT = `
+
+## Full Walkthrough Mode
+The student has failed this practice problem several times and is stuck. This time, give a COMPLETE step-by-step walkthrough: break the problem into numbered steps, explain the reasoning for each step in plain language, and finish with the full working solution code. Teach as you go so they understand it — do not just dump code.`;
+
 export const arcadeChat = async (req, res, next) => {
   try {
-    const { language, question, history = [] } = req.body;
+    const { language, question, history = [], practice } = req.body;
 
     if (!question) {
       return res.status(400).json({ success: false, error: 'Please provide a question' });
@@ -327,14 +500,46 @@ export const arcadeChat = async (req, res, next) => {
     const lang = language || 'python';
     const langDisplay = lang.charAt(0).toUpperCase() + lang.slice(1);
     const curriculum = lang === 'java' ? JAVA_CURRICULUM : PYTHON_CURRICULUM;
-    const systemPrompt = SYSTEM_PROMPT
+    let systemPrompt = SYSTEM_PROMPT
       .replace('{LANGUAGE}', langDisplay)
       .replace('{CURRICULUM}', curriculum);
+    let userQuestion = question;
+
+    // Practice context: the prompt comes from the server's own data (never the
+    // client), practice is only reachable after the mission, and the full
+    // walkthrough is only allowed after enough FAILED attempts on this problem.
+    if (practice && practice.lessonId && practice.practiceId) {
+      const found = findLessonById(practice.lessonId);
+      const problem = found && findPractice(found.lesson, practice.practiceId);
+      if (!problem) {
+        return res.status(404).json({ success: false, error: 'Practice problem not found' });
+      }
+
+      const user = await User.findById(req.user._id);
+      if (!isMissionComplete(user, found.lesson)) {
+        return res.status(403).json({ success: false, error: 'Complete the lesson mission first' });
+      }
+
+      const entry = getPracticeEntry(user, problem.id);
+      const failedAttempts = entry ? entry.attempts : 0;
+
+      userQuestion = `The student is working on the practice problem "${problem.title}": ${problem.prompt}\n\n${question}`;
+
+      if (practice.walkthrough) {
+        if (failedAttempts < WALKTHROUGH_AFTER_FAILED_ATTEMPTS) {
+          return res.status(403).json({
+            success: false,
+            error: `The full walkthrough unlocks after ${WALKTHROUGH_AFTER_FAILED_ATTEMPTS} failed attempts on this problem.`,
+          });
+        }
+        systemPrompt += WALKTHROUGH_PROMPT;
+      }
+    }
 
     // Keep history bounded to keep context manageable
     const recentHistory = history.slice(-30);
 
-    const answer = await aiChat({ systemPrompt, question, history: recentHistory });
+    const answer = await aiChat({ systemPrompt, question: userQuestion, history: recentHistory });
 
     res.status(200).json({
       success: true,

@@ -2,6 +2,7 @@ import Document from '../models/Document.js';
 import Flashcard from '../models/Flashcard.js';
 import Quiz from '../models/Quiz.js';
 import User from '../models/User.js';
+import { findLessonById, findPractice } from '../data/arcadeLessons.js';
 
 // @desc    Get user learning statistics
 // @route   GET /api/progress/dashboard
@@ -62,7 +63,26 @@ export const getDashboard = async (req, res, next) => {
       .populate('documentId', 'title')
       .select('title score totalQuestions completedAt documentId');
 
-    const { completedLessons = [] } = await User.findById(userId).select('completedLessons');
+    const { completedLessons = [], completedPractice = [] } = await User.findById(userId).select('completedLessons completedPractice');
+
+    const recentPractice = completedPractice
+      .filter((p) => p.completedAt)
+      .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
+      .slice(0, 5)
+      .map((p) => {
+        const found = findLessonById(p.lessonId);
+        const problem = found && findPractice(found.lesson, p.practiceId);
+        return {
+          id: p._id,
+          lessonId: p.lessonId,
+          practiceId: p.practiceId,
+          language: found ? found.language : null,
+          title: problem ? problem.title : p.practiceId,
+          lessonTitle: found ? found.lesson.title : null,
+          completedAt: p.completedAt,
+        };
+      });
+
     const recentLessons = completedLessons
       .slice()
       .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
@@ -95,7 +115,8 @@ export const getDashboard = async (req, res, next) => {
         recentActivity: {
           documents: recentDocuments,
           quizzes: recentQuizzes,
-          lessons: recentLessons
+          lessons: recentLessons,
+          practice: recentPractice
         }
       }
     });
