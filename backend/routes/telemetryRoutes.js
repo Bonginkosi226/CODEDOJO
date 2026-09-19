@@ -7,6 +7,7 @@ const router = express.Router();
 
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { isSessionInvalidated } from '../utils/sessionUtils.js';
 
 // A generic "soft protect" middleware to attach user if token exists, but allow if it doesn't
 const softProtect = async (req, res, next) => {
@@ -14,7 +15,9 @@ const softProtect = async (req, res, next) => {
         try {
             const token = req.headers.authorization.split(' ')[1];
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            req.user = await User.findById(decoded.id).select('-password');
+            const user = await User.findById(decoded.id).select('-password');
+            // A token from before a password reset no longer identifies the user.
+            req.user = isSessionInvalidated(user, decoded) ? undefined : user;
         } catch (e) {
             // ignore auth error for telemetry and proceed as unauthenticated
         }

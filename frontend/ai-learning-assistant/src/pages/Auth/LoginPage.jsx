@@ -118,6 +118,15 @@ return (
                 required
               />
             </div>
+
+            <div className="mt-2 text-right text-sm">
+              <Link
+                to="/forgot-password"
+                className="text-emerald-600 font-medium hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
           </div>
 
           {/* Error */}

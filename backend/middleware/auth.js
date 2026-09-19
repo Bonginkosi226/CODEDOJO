@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { isSessionInvalidated } from '../utils/sessionUtils.js';
 
 const protect = async (req, res, next) => {
     let token;
@@ -16,6 +17,15 @@ const protect = async (req, res, next) => {
             return res.status(401).json({
                 success: false,
                 error: 'User not found',
+                statusCode: 401
+            });
+           }
+
+           // Token was issued before the password was reset/changed: session is dead.
+           if (isSessionInvalidated(req.user, decoded)) {
+            return res.status(401).json({
+                success: false,
+                error: 'Your password was changed. Please log in again.',
                 statusCode: 401
             });
            }

@@ -77,12 +77,36 @@ const changePassword = async (passwords) => {
   }
 };
 
+const forgotPassword = async (email) => {
+  try {
+    const response = await axiosInstance.post(API_PATHS.AUTH.FORGOT_PASSWORD, { email });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || {
+      error: "Something went wrong. Please try again.",
+    };
+  }
+};
+
+const resetPassword = async (token, newPassword) => {
+  try {
+    const response = await axiosInstance.post(API_PATHS.AUTH.RESET_PASSWORD, { token, newPassword });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || {
+      error: "Something went wrong. Please try again.",
+    };
+  }
+};
+
 const authService = {
   login,
   register,
   getProfile,
   updateProfile,
   changePassword,
+  forgotPassword,
+  resetPassword,
 };
 
 export default authService;

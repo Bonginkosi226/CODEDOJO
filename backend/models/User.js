@@ -47,6 +47,22 @@ password: {
             default: Date.now
         }
     }],
+    // Password reset: only the SHA-256 HASH of the emailed token is stored, so a
+    // database leak can't be turned into working reset links. Never selected by default.
+    passwordResetToken: {
+        type: String,
+        select: false
+    },
+    passwordResetExpires: {
+        type: Date,
+        select: false
+    },
+    // JWTs issued before this moment are rejected (see utils/sessionUtils.js),
+    // which is how "invalidate existing sessions" works with stateless tokens.
+    passwordChangedAt: {
+        type: Date,
+        default: null
+    },
     // Only ever set server-side (see backend/scripts/setRole.mjs) — never from
     // a request body. Users without the field are treated as students.
     role: {
