@@ -47,10 +47,45 @@ password: {
             default: Date.now
         }
     }],
+    // Only ever set server-side (see backend/scripts/setRole.mjs) — never from
+    // a request body. Users without the field are treated as students.
+    role: {
+        type: String,
+        enum: ['student', 'admin'],
+        default: 'student'
+    },
     arcadeProgress: {
         type: Number,
         default: 0
     },
+    // Consecutive days with at least one graded Arcade submission.
+    currentStreak: {
+        type: Number,
+        default: 0
+    },
+    lastActivityDate: {
+        type: Date,
+        default: null
+    },
+    // Failed mission attempts per lesson (passes live in completedLessons).
+    missionAttempts: [{
+        lessonId: {
+            type: String,
+            required: true
+        },
+        attempts: {
+            type: Number,
+            default: 0
+        },
+        code: {
+            type: String,
+            default: ''
+        },
+        lastAttemptAt: {
+            type: Date,
+            default: null
+        }
+    }],
     completedLessons: [{
         lessonId: {
             type: String,

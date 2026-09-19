@@ -16,6 +16,8 @@ import quizRoutes from './routes/quizRoutes.js';
 import progressRoutes from './routes/progressRoutes.js';
 import executeRoutes from './routes/executeRoutes.js';
 import arcadeRoutes from './routes/arcadeRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 import leaderboardRoutes from './routes/leaderboardRoutes.js';
 import telemetryRoutes from './routes/telemetryRoutes.js';
 
@@ -54,6 +56,8 @@ app.use('/api/quizzes', quizRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/execute', executeRoutes);
 app.use('/api/arcade', arcadeRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/telemetry', telemetryRoutes);
 

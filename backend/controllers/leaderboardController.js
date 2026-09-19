@@ -5,7 +5,8 @@ import User from '../models/User.js';
 // @access  Private
 export const getLeaderboard = async (req, res, next) => {
   try {
-    const topUsers = await User.find({})
+    // Admins (teachers) never appear on the student leaderboard.
+    const topUsers = await User.find({ role: { $ne: 'admin' } })
       .sort({ xp: -1 })
       .limit(50)
       .select('username xp level profileImage badges');

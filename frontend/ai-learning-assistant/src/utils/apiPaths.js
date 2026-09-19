@@ -69,6 +69,22 @@ export const API_PATHS = {
     GET: "/api/leaderboard",
   },
 
+  ADMIN: {
+    OVERVIEW: "/api/admin/overview",
+    STUDENTS: "/api/admin/students",
+    STUDENT: (id) => `/api/admin/students/${id}`,
+    STRUGGLES: "/api/admin/struggles",
+    ANNOUNCEMENTS: "/api/admin/announcements",
+  },
+
+  NOTIFICATIONS: {
+    LIST: "/api/notifications",
+    READ_ALL: "/api/notifications/read-all",
+    READ: (id) => `/api/notifications/${id}/read`,
+    DELETE: (id) => `/api/notifications/${id}`,
+    CLEAR: "/api/notifications",
+  },
+
   TELEMETRY: {
     BULK: "/api/telemetry/bulk",
   }

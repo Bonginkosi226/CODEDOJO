@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
+import notificationService from '../services/notificationService';
 
 const NotificationContext = createContext();
 
@@ -63,8 +65,33 @@ const INITIAL_NOTIFICATIONS = [
   }
 ];
 
+const timeAgo = (iso) => {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (seconds < 60) return 'Just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+};
+
+// Server notifications (e.g. teacher announcements) are stored per user in the
+// database, so their read/deleted state persists across devices.
+const fromServer = (n) => ({
+  id: `srv-${n._id}`,
+  title: n.title,
+  message: n.message,
+  time: timeAgo(n.createdAt),
+  date: new Date(n.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+  category: n.category || 'system',
+  unread: !n.readAt,
+  iconType: 'sparkles'
+});
+
+const isServerId = (id) => typeof id === 'string' && id.startsWith('srv-');
+
 export const NotificationProvider = ({ children }) => {
-  const [notifications, setNotifications] = useState(() => {
+  const { isAuthenticated } = useAuth();
+  const [serverNotifications, setServerNotifications] = useState([]);
+  const [localNotifications, setNotifications] = useState(() => {
     try {
       const saved = localStorage.getItem('codedojo_notifications');
       if (saved) {
@@ -76,16 +103,46 @@ export const NotificationProvider = ({ children }) => {
     return INITIAL_NOTIFICATIONS;
   });
 
-  // Sync to localStorage whenever notifications change
+  // Sync the local (demo) notifications to localStorage whenever they change
   useEffect(() => {
     try {
-      localStorage.setItem('codedojo_notifications', JSON.stringify(notifications));
+      localStorage.setItem('codedojo_notifications', JSON.stringify(localNotifications));
     } catch (e) {
       console.error('Failed to save notifications to localStorage:', e);
     }
-  }, [notifications]);
+  }, [localNotifications]);
+
+  // Load server notifications now, then refresh every minute while logged in
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await notificationService.list();
+        if (!cancelled) setServerNotifications((res.data || []).map(fromServer));
+      } catch {
+        // Notifications are non-critical — ignore transient failures.
+      }
+    };
+
+    load();
+    const interval = setInterval(load, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isAuthenticated]);
+
+  // Server notifications only show while logged in
+  const notifications = [...(isAuthenticated ? serverNotifications : []), ...localNotifications];
 
   const markAsRead = (id) => {
+    if (isServerId(id)) {
+      setServerNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, unread: false } : n)));
+      notificationService.markRead(id.slice(4)).catch(() => {});
+      return;
+    }
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, unread: false } : n))
     );
@@ -93,14 +150,23 @@ export const NotificationProvider = ({ children }) => {
 
   const markAllAsRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+    setServerNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+    notificationService.markAllRead().catch(() => {});
   };
 
   const deleteNotification = (id) => {
+    if (isServerId(id)) {
+      setServerNotifications((prev) => prev.filter((n) => n.id !== id));
+      notificationService.remove(id.slice(4)).catch(() => {});
+      return;
+    }
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
   const clearAllNotifications = () => {
     setNotifications([]);
+    setServerNotifications([]);
+    notificationService.clear().catch(() => {});
   };
 
   const addNotification = (newNotif) => {

@@ -21,6 +21,7 @@ const Header = ({ toggleSidebar }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const dropdownRef = useRef(null);
 
+  const isAdmin = user?.role === "admin";
   const xp = user?.xp || 0;
   const level = user?.level || 1;
   const currentLevelFloor = xpForLevel(level);
@@ -56,6 +57,10 @@ const Header = ({ toggleSidebar }) => {
         <div className="hidden md:block"></div>
 
         <div className="flex items-center gap-4">
+          {/* Student-only: XP bar and notification bell. Admins earn no XP and are
+              never sent announcements, so both would be meaningless for them. */}
+          {!isAdmin && (
+          <>
           {/* Gamification XP Bar */}
           <div className="hidden sm:flex items-center gap-3 px-4 py-2 bg-slate-100 rounded-[2rem] border-2 border-slate-200 shadow-sm cursor-pointer hover:-translate-y-1 hover:border-slate-300 transition-all">
             <div className="flex flex-col items-end">
@@ -167,6 +172,9 @@ const Header = ({ toggleSidebar }) => {
               </div>
             )}
           </div>
+
+          </>
+          )}
 
           {/* User Profile */}
           <div className="flex items-center gap-3 pl-4 border-l-2 border-slate-200/60 h-10">

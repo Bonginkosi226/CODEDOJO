@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import authService from "../services/authService";
 
 const AuthContext = createContext();
 
@@ -31,6 +32,24 @@ export const AuthProvider = ({ children }) => {
         const userData = JSON.parse(userStr);
         setUser(userData);
         setIsAuthenticated(true);
+
+        // Refresh role/xp/level from the server so a role change (e.g. a teacher
+        // being made admin) applies without logging out and back in.
+        authService
+          .getProfile()
+          .then(({ data }) => {
+            setUser((prev) => {
+              const merged = {
+                ...(prev || userData),
+                role: data.role,
+                xp: data.xp,
+                level: data.level,
+              };
+              localStorage.setItem("user", JSON.stringify(merged));
+              return merged;
+            });
+          })
+          .catch(() => {});
       } else {
         logout(false); // silent logout
       }

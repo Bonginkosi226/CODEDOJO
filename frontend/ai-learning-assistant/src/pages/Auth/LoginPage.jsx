@@ -27,7 +27,8 @@ const LoginPage = () => {
       const { token, user } = response.data || response;
       login(user, token);
       toast.success('Logged in successfully!');
-      navigate('/dashboard');
+      // Teachers land on their dashboard, students on theirs
+      navigate(user?.role === 'admin' ? '/admin' : '/dashboard');
     } catch (err) {
       setError(err.message || 'Failed to login. Please check your credentials.');
       toast.error(err.message || 'Failed to login.');

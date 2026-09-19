@@ -10,6 +10,7 @@ import {
   BrainCircuit, 
   BookOpen, 
   Gamepad2,
+  ShieldCheck,
   Trophy,
   Bell,
   ChevronLeft,
@@ -20,7 +21,7 @@ import {
 const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
   const [isRetracted, setIsRetracted] = React.useState(false);
 
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -28,7 +29,7 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
     navigate("/login");
   };
 
-  const navLinks = [
+  const studentLinks = [
     { to: "/dashboard", icon: LayoutDashboard, text: "Dashboard" },
     { to: "/documents", icon: FileText, text: "Documents" },
     { to: "/flashcards", icon: BookOpen, text: "Flashcards" },
@@ -37,6 +38,15 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
     { to: "/notifications", icon: Bell, text: "Notifications" },
     { to: "/profile", icon: User, text: "Profile" },
   ];
+
+  // Admins (teachers) only get the teacher dashboard and their profile (for
+  // changing their password) — every student page redirects them to /admin.
+  const adminLinks = [
+    { to: "/admin", icon: ShieldCheck, text: "Admin" },
+    { to: "/profile", icon: User, text: "Profile" },
+  ];
+
+  const navLinks = user?.role === "admin" ? adminLinks : studentLinks;
 
   return (
     <>

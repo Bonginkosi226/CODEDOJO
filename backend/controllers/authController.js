@@ -60,6 +60,7 @@ export const register = async (req, res, next) => {
                     profileImage: user.profileImage,
                     xp: user.xp,
                     level: user.level,
+                    role: user.role,
                     createdAt: user.createdAt
                 },
                 token
@@ -134,7 +135,8 @@ export const login = async (req, res, next) => {
                 email: user.email,
                 profileImage: user.profileImage,
                 xp: user.xp,
-                level: user.level
+                level: user.level,
+                role: user.role
             },
             token,
             message: "Login successful",
@@ -164,6 +166,7 @@ export const getProfile = async (req, res, next) => {
                 profileImage: user.profileImage,
                 xp: user.xp,
                 level: user.level,
+                role: user.role,
                 createdAt: user.createdAt,
                 updatedAt: user.updatedAt
             },

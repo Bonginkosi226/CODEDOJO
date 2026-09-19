@@ -10,6 +10,7 @@ import {
   countPracticeDone,
   buildLessonStatus,
 } from '../services/lessonProgress.js';
+import { touchActivity } from '../services/activity.js';
 
 // After this many failed attempts on the SAME practice problem, Sensei may
 // give a full step-by-step walkthrough instead of only hints.
@@ -257,7 +258,27 @@ export const submitLesson = async (req, res, next) => {
       });
     }
 
+    // Every graded submission counts as activity (streak / last active).
+    touchActivity(user);
+
+    // Track FAILED mission attempts so teachers can see where students are stuck.
+    // Passes live in completedLessons; runner-unavailable is never counted.
+    const recordMissionFailure = async () => {
+      if (!isMissionComplete(user, lesson)) {
+        let entry = user.missionAttempts.find((m) => m.lessonId === lesson.id);
+        if (!entry) {
+          user.missionAttempts.push({ lessonId: lesson.id, attempts: 0 });
+          entry = user.missionAttempts[user.missionAttempts.length - 1];
+        }
+        entry.attempts += 1;
+        entry.code = code;
+        entry.lastAttemptAt = new Date();
+      }
+      await user.save();
+    };
+
     if (evaluation.status === STATUS.CODE_ERROR) {
+      await recordMissionFailure();
       return res.status(200).json({
         success: true,
         data: {
@@ -273,6 +294,7 @@ export const submitLesson = async (req, res, next) => {
     }
 
     if (!evaluation.passed) {
+      await recordMissionFailure();
       return res.status(200).json({
         success: true,
         data: {
@@ -299,7 +321,8 @@ export const submitLesson = async (req, res, next) => {
         practiceRequired: (lesson.practice || []).length > 0,
       });
 
-      xpAwarded = lesson.xp || 0;
+      // Admins never earn XP (they can still try lessons to test them).
+      xpAwarded = user.role === 'admin' ? 0 : lesson.xp || 0;
       user.xp += xpAwarded;
       user.level = calculateLevel(user.xp);
 
@@ -408,6 +431,11 @@ export const submitPractice = async (req, res, next) => {
 
     const evaluation = await evaluateSubmission({ language, code, checks: practice.checks });
 
+    // Graded attempts (pass or fail) count as activity; runner-unavailable does not.
+    if (evaluation.status !== STATUS.UNAVAILABLE) {
+      touchActivity(user);
+    }
+
     let entry = getPracticeEntry(user, practice.id);
     if (!entry) {
       user.completedPractice.push({ lessonId: lesson.id, practiceId: practice.id, code: '', attempts: 0 });
@@ -465,7 +493,7 @@ export const submitPractice = async (req, res, next) => {
     let xpAwarded = 0;
     if (!entry.completedAt) {
       entry.completedAt = new Date();
-      xpAwarded = practice.xp || 0;
+      xpAwarded = user.role === 'admin' ? 0 : practice.xp || 0;
       user.xp += xpAwarded;
       user.level = calculateLevel(user.xp);
     }
